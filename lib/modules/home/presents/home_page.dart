@@ -1,3 +1,5 @@
+import 'package:bingo/modules/home/models/boards.model.dart';
+import 'package:bingo/modules/home/models/tile.model.dart';
 import 'package:bingo/modules/home/presents/home_controller.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +22,11 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     // Get the controller from GetIt and register it with GetX
     controller = GetIt.I.get<HomeController>();
+
+    // Força a remoção de qualquer instância anterior e registra uma nova
+    if (Get.isRegistered<HomeController>()) {
+      Get.delete<HomeController>();
+    }
     Get.put(controller);
 
     // Aguarda o próximo frame para garantir que o GetX esteja pronto
@@ -33,6 +40,15 @@ class _HomePageState extends State<HomePage> {
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    // Remove o controller do GetX quando o widget for descartado
+    if (Get.isRegistered<HomeController>()) {
+      Get.delete<HomeController>();
+    }
+    super.dispose();
   }
 
   @override
@@ -860,7 +876,7 @@ class _HomePageState extends State<HomePage> {
     return Column(
       children: [
         ElevatedButton.icon(
-          onPressed: controller.generateBoards,
+          onPressed: () => controller.generateBoards(),
           icon: const Icon(Icons.auto_awesome, size: 18),
           label: const Text(
             'Gerar tabelas',

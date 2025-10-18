@@ -1,3 +1,5 @@
+import 'package:bingo/modules/home/models/boards.model.dart';
+import 'package:bingo/modules/home/models/tile.model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -457,39 +459,3 @@ class HomeController extends GetxController {
 }
 
 enum BingoTileType { artist, blank, free }
-
-class BingoTile {
-  final BingoTileType type;
-  final String? content;
-  final bool isMarked;
-
-  const BingoTile({required this.type, this.content, this.isMarked = false});
-
-  BingoTile copyWith({BingoTileType? type, String? content, bool? isMarked}) {
-    return BingoTile(
-      type: type ?? this.type,
-      content: content ?? this.content,
-      isMarked: isMarked ?? this.isMarked,
-    );
-  }
-}
-
-class BingoBoard {
-  final int id;
-  final List<BingoTile> tiles;
-  final int gridSize;
-
-  const BingoBoard({
-    required this.id,
-    required this.tiles,
-    required this.gridSize,
-  });
-
-  BingoBoard copyWith({int? id, List<BingoTile>? tiles, int? gridSize}) {
-    return BingoBoard(
-      id: id ?? this.id,
-      tiles: tiles ?? this.tiles,
-      gridSize: gridSize ?? this.gridSize,
-    );
-  }
-}
