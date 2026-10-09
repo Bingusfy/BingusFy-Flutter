@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:bingo/modules/entry/models/spotify_playback.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'spotify_ios_authorization.dart';
 
 class SpotifyAuth {
   static const _clientId = String.fromEnvironment('SPOTIFY_CLIENT_ID');
@@ -81,19 +83,37 @@ class SpotifyNativeClient {
     return next;
   }
 
+  void _trace(String message) {
+    developer.log(message, name: 'SpotifyAuth');
+    if (const bool.fromEnvironment('SPOTIFY_AUTH_DIAGNOSTICS')) {
+      debugPrint('[SpotifyAuth] $message');
+      try {
+        File(
+          '${Directory.systemTemp.path}/spotify-auth-diagnostics.log',
+        ).writeAsStringSync(
+          '${DateTime.now().toIso8601String()} $message\n',
+          mode: FileMode.append,
+          flush: true,
+        );
+      } on FileSystemException {
+        // Diagnostics must never interrupt authentication.
+      }
+    }
+  }
+
   Future<T> _authStep<T>(
     String stage,
     Future<T> operation,
     Duration timeout,
   ) async {
     // Log stages only: OAuth URLs, codes and tokens must never reach the logs.
-    developer.log('$stage: started', name: 'SpotifyAuth');
+    _trace('$stage: started');
     try {
       final result = await operation.timeout(timeout);
-      developer.log('$stage: completed', name: 'SpotifyAuth');
+      _trace('$stage: completed');
       return result;
     } catch (error) {
-      developer.log('$stage: ${error.runtimeType}', name: 'SpotifyAuth');
+      _trace('$stage: ${error.runtimeType}');
       rethrow;
     }
   }
@@ -104,15 +124,24 @@ class SpotifyNativeClient {
       // code separately so a stalled token request cannot hold the UI forever.
       final authorization = await _authStep(
         'authorize',
-        _appAuth.authorize(
-          AuthorizationRequest(
-            clientId,
-            SpotifyAuth.redirectUri,
-            serviceConfiguration: _configuration,
-            scopes: _scopes,
-          ),
-        ),
-        authorizationTimeout,
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? SpotifyIosAuthorization.authorize(
+                clientId: clientId,
+                redirectUri: SpotifyAuth.redirectUri,
+                scopes: _scopes,
+                timeout: authorizationTimeout,
+              )
+            : _appAuth.authorize(
+                AuthorizationRequest(
+                  clientId,
+                  SpotifyAuth.redirectUri,
+                  serviceConfiguration: _configuration,
+                  scopes: _scopes,
+                ),
+              ),
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? authorizationTimeout + const Duration(seconds: 3)
+            : authorizationTimeout,
       );
       final code = authorization.authorizationCode;
       final verifier = authorization.codeVerifier;
@@ -139,7 +168,7 @@ class SpotifyNativeClient {
       );
       // A late result after timeout never reaches this write.
       await _save(token, previous: null);
-      developer.log('session: saved', name: 'SpotifyAuth');
+      _trace('session: saved');
     } on FlutterAppAuthUserCancelledException {
       // The entry page restores the button when the user dismisses the browser.
     }
@@ -160,7 +189,9 @@ class SpotifyNativeClient {
       'expiresAt': token.accessTokenExpirationDateTime!.millisecondsSinceEpoch,
       'scopes': token.scopes ?? previous?['scopes'] ?? _scopes,
     };
+    _trace('storage.write: started');
     await _storage.write(key: _storageKey, value: jsonEncode(session));
+    _trace('storage.write: completed');
     _session = session;
     _loaded = true;
   }
@@ -168,7 +199,9 @@ class SpotifyNativeClient {
   Future<bool> restore({bool forceRefresh = false}) => _exclusive(() async {
     if (clientId.isEmpty) return false;
     if (!_loaded) {
+      _trace('storage.read: started');
       final raw = await _storage.read(key: _storageKey);
+      _trace('storage.read: completed');
       try {
         _session = raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
       } catch (_) {

@@ -13,14 +13,16 @@ class FakeAppAuth extends FlutterAppAuth {
   bool cancel = false;
   Object? refreshError;
   int refreshes = 0;
-  AuthorizationTokenRequest? authorization;
+  AuthorizationRequest? authorization;
+  TokenRequest? exchange;
+  int exchanges = 0;
+  Completer<AuthorizationResponse>? pendingAuthorization;
+  Completer<TokenResponse>? pendingExchange;
   TokenRequest? renewal;
   Completer<TokenResponse>? pending;
 
   @override
-  Future<AuthorizationTokenResponse> authorizeAndExchangeCode(
-    AuthorizationTokenRequest request,
-  ) async {
+  Future<AuthorizationResponse> authorize(AuthorizationRequest request) async {
     authorization = request;
     if (cancel) {
       throw FlutterAppAuthUserCancelledException(
@@ -28,20 +30,30 @@ class FakeAppAuth extends FlutterAppAuth {
         platformErrorDetails: FlutterAppAuthPlatformErrorDetails(),
       );
     }
-    return AuthorizationTokenResponse(
-      'access',
-      'refresh',
-      DateTime.now().add(const Duration(hours: 1)),
-      null,
-      'Bearer',
-      null,
-      null,
-      null,
+    if (pendingAuthorization != null) return pendingAuthorization!.future;
+    return const AuthorizationResponse(
+      authorizationCode: 'code',
+      codeVerifier: 'verifier',
+      nonce: 'nonce',
     );
   }
 
   @override
   Future<TokenResponse> token(TokenRequest request) async {
+    if (request.authorizationCode != null) {
+      exchange = request;
+      exchanges++;
+      if (pendingExchange != null) return pendingExchange!.future;
+      return TokenResponse(
+        'access',
+        'refresh',
+        DateTime.now().add(const Duration(hours: 1)),
+        null,
+        'Bearer',
+        null,
+        null,
+      );
+    }
     renewal = request;
     refreshes++;
     if (refreshError != null) throw refreshError!;
@@ -95,6 +107,10 @@ void main() {
       expect(await client.restore(), isFalse);
       await client.signIn();
       expect(auth.authorization!.redirectUrl, SpotifyAuth.redirectUri);
+      expect(auth.exchange!.redirectUrl, SpotifyAuth.redirectUri);
+      expect(auth.exchange!.authorizationCode, 'code');
+      expect(auth.exchange!.codeVerifier, 'verifier');
+      expect(auth.exchange!.nonce, 'nonce');
       expect(
         auth.authorization!.scopes,
         contains('user-modify-playback-state'),
@@ -267,4 +283,75 @@ void main() {
       expect(playback.canControl, isTrue);
     },
   );
+  test(
+    'missing callback releases queue and ignores late authorization',
+    () async {
+      auth.pendingAuthorization = Completer<AuthorizationResponse>();
+      final stuck = auth.pendingAuthorization!;
+      client = SpotifyNativeClient(
+        clientId: 'test-client',
+        appAuth: auth,
+        authorizationTimeout: const Duration(milliseconds: 10),
+      );
+      await expectLater(client.signIn(), throwsA(isA<TimeoutException>()));
+      expect(await client.restore(), isFalse);
+      stuck.complete(
+        const AuthorizationResponse(
+          authorizationCode: 'late',
+          codeVerifier: 'late',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(auth.exchanges, 0);
+      auth.pendingAuthorization = null;
+      await client.signIn();
+      expect(await client.restore(), isTrue);
+    },
+  );
+
+  test('stalled exchange cannot block retry or save a late token', () async {
+    auth.pendingExchange = Completer<TokenResponse>();
+    final stuck = auth.pendingExchange!;
+    client = SpotifyNativeClient(
+      clientId: 'test-client',
+      appAuth: auth,
+      tokenTimeout: const Duration(milliseconds: 10),
+    );
+    await expectLater(client.signIn(), throwsA(isA<TimeoutException>()));
+    await client.signOut();
+    stuck.complete(auth.renewedToken());
+    await Future<void>.delayed(Duration.zero);
+    expect(await client.restore(), isFalse);
+    auth.pendingExchange = null;
+    await client.signIn();
+    expect(await client.restore(), isTrue);
+  });
+
+  test('missing PKCE verifier prevents token exchange', () async {
+    auth.pendingAuthorization = Completer<AuthorizationResponse>()
+      ..complete(const AuthorizationResponse(authorizationCode: 'code'));
+    await expectLater(
+      client.signIn(),
+      throwsA(isA<SpotifyPlaybackException>()),
+    );
+    expect(auth.exchanges, 0);
+    expect(await client.restore(), isFalse);
+  });
+
+  test('a stuck renewal releases queued sign-out', () async {
+    client = SpotifyNativeClient(
+      clientId: 'test-client',
+      appAuth: auth,
+      tokenTimeout: const Duration(milliseconds: 10),
+    );
+    await client.signIn();
+    auth.pending = Completer<TokenResponse>();
+    final renewal = client.restore(forceRefresh: true);
+    final logout = client.signOut();
+    await expectLater(renewal, throwsA(isA<TimeoutException>()));
+    await logout;
+    auth.pending!.complete(auth.renewedToken());
+    await Future<void>.delayed(Duration.zero);
+    expect(await client.restore(), isFalse);
+  });
 }

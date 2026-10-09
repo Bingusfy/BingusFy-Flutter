@@ -129,3 +129,34 @@ Nos apps nativos iOS e Android, as ondas mantêm uma área de desenho mínima de
 1440 × 900, centralizada e recortada nas bordas, preservando a escala sem causar
 rolagem. Na web, inclusive em navegadores de celular, o fundo mantém o
 dimensionamento original pela área disponível.
+
+### Retorno do login nativo
+
+No iOS, ASWebAuthenticationSession e SceneDelegate entregam o callback ao Dart,
+que valida o destino e o estado e gera o PKCE S256. No Android, AppAuth continua
+recebendo e validando o callback. A troca de tokens usa AppAuth em ambos.
+O roteamento automático de
+links do Flutter está desativado nos manifests nativos para que o callback OAuth
+não abra uma rota da interface. No Android, a activity mantém a afinidade padrão
+para retornar à tarefa do app após a autorização.
+
+A autorização e a troca do código são chamadas separadas. A autorização tem
+limite de 3 minutos; a troca e a renovação de tokens têm limite de 30 segundos.
+Falhas liberam a fila de operações e o botão para uma nova tentativa. Respostas
+que chegam após o limite não salvam sessão nem navegam para a home. Os logs
+`SpotifyAuth` registram apenas as etapas, sem URLs, códigos ou tokens.
+
+Teste do retorno à tela, cancelamento e timeout (OAuth simulado, sem rede):
+
+```sh
+flutter test test/spotify_login_return_test.dart
+```
+
+O retorno iOS aceita o caminho vazio e sua normalização para `/`, mantendo a
+validação de scheme, host, porta, estado e código. Cada tentativa mantém sua
+própria sessão; conclusão, cancelamento e timeout encerram a sessão nativa.
+Callbacks duplicados ou de tentativas anteriores não concluem a tentativa nova.
+
+`--dart-define=SPOTIFY_AUTH_DIAGNOSTICS=true` habilita um registro temporário de
+etapas em `tmp/spotify-auth-diagnostics.log` no sandbox do app (sem URLs,
+códigos ou tokens). Por padrão ele fica desativado.

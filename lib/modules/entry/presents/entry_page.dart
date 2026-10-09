@@ -10,7 +10,16 @@ import 'package:bingo/global/widgets/bingus_brand_mark.dart';
 import 'package:bingo/global/widgets/entrance_fade.dart';
 
 class EntryPage extends StatefulWidget {
-  const EntryPage({super.key});
+  const EntryPage({
+    super.key,
+    this.restoreSession,
+    this.signIn,
+    this.spotifyConfigured,
+  });
+
+  final Future<bool> Function()? restoreSession;
+  final Future<void> Function()? signIn;
+  final bool? spotifyConfigured;
 
   @override
   State<EntryPage> createState() => _EntryPageState();
@@ -29,7 +38,8 @@ class _EntryPageState extends State<EntryPage> {
 
   Future<void> _restore() async {
     try {
-      final authenticated = await SpotifyAuth.restore();
+      final authenticated =
+          await (widget.restoreSession ?? SpotifyAuth.restore)();
       if (!mounted) return;
       if (authenticated) {
         Navigator.of(context).pushReplacementNamed('/home');
@@ -49,7 +59,7 @@ class _EntryPageState extends State<EntryPage> {
       _error = null;
     });
     try {
-      await SpotifyAuth.signIn();
+      await (widget.signIn ?? SpotifyAuth.signIn)();
       if (!kIsWeb) await _restore();
     } on TimeoutException {
       if (mounted) {
@@ -62,8 +72,9 @@ class _EntryPageState extends State<EntryPage> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error =
-              'Não foi possível concluir o login com Spotify. Tente novamente.';
+          _error = kIsWeb
+              ? 'Não foi possível abrir o Spotify. Tente novamente.'
+              : 'Não foi possível concluir o login com Spotify. Tente novamente.';
         });
       }
     } finally {
@@ -243,7 +254,9 @@ class _EntryPageState extends State<EntryPage> {
                                             FilledButton(
                                               onPressed:
                                                   !_busy &&
-                                                      SpotifyAuth.configured
+                                                      (widget.spotifyConfigured ??
+                                                          SpotifyAuth
+                                                              .configured)
                                                   ? _signIn
                                                   : null,
                                               style: FilledButton.styleFrom(
@@ -288,7 +301,8 @@ class _EntryPageState extends State<EntryPage> {
                                                 ],
                                               ),
                                             ),
-                                            if (!SpotifyAuth.configured) ...[
+                                            if (!(widget.spotifyConfigured ??
+                                                SpotifyAuth.configured)) ...[
                                               const SizedBox(height: 14),
                                               const Text(
                                                 'O acesso com Spotify estará disponível em breve.',
