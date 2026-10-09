@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/firebase_tests/node_modules/
+/.firebase/
+/config/firebase.local.json
 
 # Symbolication related
 app.*.symbols

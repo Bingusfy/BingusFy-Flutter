@@ -1,12 +1,12 @@
 {
-    "name": "bingo",
-    "short_name": "bingo",
+    "name": "BingusFy",
+    "short_name": "BingusFy",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0A0A0A",
+    "theme_color": "#1ED760",
+    "description": "Bingo musical com sua fila do Spotify e amigos.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

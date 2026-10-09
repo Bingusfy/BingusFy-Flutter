@@ -1,132 +1,62 @@
+import 'dart:async';
+
 import 'package:bingo/modules/home/models/boards.model.dart';
 import 'package:bingo/modules/home/models/tile.model.dart';
+import 'package:bingo/modules/entry/models/spotify_playback.dart';
+import 'package:bingo/modules/entry/services/spotify_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-class HomeController extends GetxController {
+class HomeController extends GetxController with WidgetsBindingObserver {
+  HomeController({
+    Future<SpotifyPlayback> Function()? loadPlayback,
+    Future<void> Function(String)? controlPlayback,
+    this.isRoomGuest = false,
+    this.onRoomTileMark,
+  }) : _loadPlayback = loadPlayback ?? SpotifyAuth.loadPlayback,
+       _controlPlayback = controlPlayback ?? SpotifyAuth.controlPlayback;
+
+  final Future<SpotifyPlayback> Function() _loadPlayback;
+  final Future<void> Function(String) _controlPlayback;
+  final bool isRoomGuest;
+  final Future<void> Function(int index, bool marked)? onRoomTileMark;
+  bool get canControlPlayer => !isRoomGuest;
+  bool get isRoom => onRoomTileMark != null;
+  final spotifyCommandBusy = false.obs;
+  final spotifyPositionMs = 0.obs;
+  Timer? _pollTimer;
+  Timer? _positionTimer;
+  bool _spotifySyncing = false;
+  static const spotifySyncInterval = Duration(seconds: 3);
+  final spotifyPlayback = Rxn<SpotifyPlayback>();
+  final spotifyLoading = false.obs;
+  final spotifyError = ''.obs;
+  final spotifyNeedsAuthorization = false.obs;
+  final spotifyUpdatedAt = Rxn<DateTime>();
+  DateTime? _retryAfter;
+  bool _hasImportedQueue = false;
+
   static const primaryColor = Color(0xFF1ED760);
   static const primaryBg = Color(0x141ED760);
   static const primaryBorder = Color(0x591ED760);
 
-  // Sample artist dataset
-  static const List<String> artistsDb = [
-    "Taylor Swift",
-    "Drake",
-    "The Weeknd",
-    "Ariana Grande",
-    "Bad Bunny",
-    "Billie Eilish",
-    "Dua Lipa",
-    "Post Malone",
-    "Harry Styles",
-    "Olivia Rodrigo",
-    "Ed Sheeran",
-    "Beyoncé",
-    "Rihanna",
-    "Kendrick Lamar",
-    "Travis Scott",
-    "SZA",
-    "Doja Cat",
-    "Bruno Mars",
-    "Lady Gaga",
-    "Justin Bieber",
-    "Coldplay",
-    "Imagine Dragons",
-    "Lana Del Rey",
-    "J. Cole",
-    "Metro Boomin",
-    "Nicki Minaj",
-    "Kanye West",
-    "Frank Ocean",
-    "Lil Nas X",
-    "Shawn Mendes",
-    "Adele",
-    "KAROL G",
-    "Rosalía",
-    "Shakira",
-    "Feid",
-    "J Balvin",
-    "Anitta",
-    "BLACKPINK",
-    "BTS",
-    "NewJeans",
-    "Arctic Monkeys",
-    "Tame Impala",
-    "The 1975",
-    "Lorde",
-    "Hozier",
-    "Paramore",
-    "The Killers",
-    "The Neighbourhood",
-    "Billie Marten",
-    "Phoebe Bridgers",
-    "Miley Cyrus",
-    "Sam Smith",
-    "Calvin Harris",
-    "Zedd",
-    "Kygo",
-    "David Guetta",
-    "Avicii",
-    "Swedish House Mafia",
-    "Marshmello",
-    "Skrillex",
-    "Queen",
-    "The Beatles",
-    "Fleetwood Mac",
-    "Elton John",
-    "Michael Jackson",
-    "Prince",
-    "Nirvana",
-    "Red Hot Chili Peppers",
-    "U2",
-    "Radiohead",
-    "Linkin Park",
-    "Twenty One Pilots",
-    "Muse",
-    "Gorillaz",
-    "Daft Punk",
-    "ODESZA",
-    "Porter Robinson",
-    "Madeon",
-    "Imagine Dragons",
-    "Jon Bellion",
-    "Childish Gambino",
-    "Tyler, The Creator",
-    "A\$AP Rocky",
-    "Lil Uzi Vert",
-    "Future",
-    "21 Savage",
-    "Offset",
-    "Quavo",
-    "Megan Thee Stallion",
-    "Ice Spice",
-    "Noah Kahan",
-    "Zach Bryan",
-    "Morgan Wallen",
-    "Luke Combs",
-    "Kacey Musgraves",
-    "Childish Gambino",
-    "Jack Harlow",
-    "Lil Wayne",
-    "Eminem",
-    "Sia",
-    "The Chainsmokers",
-    "Charli XCX",
-    "The Cure",
-    "Depeche Mode",
-    "Joy Division",
-    "The Smiths",
-    "Pixies",
-    "Bon Iver",
-    "The National",
-    "Joji",
-  ];
+  // Artist source is the authenticated user's Spotify queue.
+  final artistsDb = <String>[].obs;
 
   // Observable state
   final searchText = ''.obs;
   final selectedArtists = <String>[].obs;
   final suggestions = <String>[].obs;
   final showSuggestions = false.obs;
+
+  // Responsive variables
+  final screenWidth = 0.0.obs;
+  final screenHeight = 0.0.obs;
+
+  bool get isMobile => screenWidth.value < 640;
+  bool get isTablet => screenWidth.value >= 640 && screenWidth.value < 1024;
+  bool get isDesktop => screenWidth.value >= 1024;
 
   final numBoards = 6.obs;
   final gridSize = 5.obs;
@@ -143,7 +73,10 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+    _startSpotifyTimers();
     updateSuggestions();
+    refreshSpotify();
 
     // Listen to search text changes
     searchController.addListener(() {
@@ -156,12 +89,180 @@ class HomeController extends GetxController {
       if (searchFocusNode.hasFocus) {
         showSuggestions.value = true;
         updateSuggestions();
+      } else {
+        // Delay to allow tap on suggestions to work
+        Future.delayed(Duration(milliseconds: 200), () {
+          showSuggestions.value = false;
+        });
       }
     });
   }
 
+  void _startSpotifyTimers() {
+    _stopSpotifyTimers();
+    _pollTimer = Timer.periodic(spotifySyncInterval, (_) {
+      if (!isRoomGuest &&
+          !spotifyCommandBusy.value &&
+          !spotifyNeedsAuthorization.value) {
+        refreshSpotify(silent: true);
+      }
+    });
+    _positionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final playback = spotifyPlayback.value;
+      final updated = spotifyUpdatedAt.value;
+      if (playback?.isPlaying != true ||
+          updated == null ||
+          spotifyError.value.isNotEmpty ||
+          spotifyCommandBusy.value) {
+        return;
+      }
+      final duration = playback!.current?.durationMs ?? 0;
+      if (duration > 0) {
+        spotifyPositionMs.value =
+            (playback.progressMs +
+                    DateTime.now().difference(updated).inMilliseconds)
+                .clamp(0, duration);
+      }
+    });
+  }
+
+  void _stopSpotifyTimers() {
+    _pollTimer?.cancel();
+    _positionTimer?.cancel();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startSpotifyTimers();
+      if (!isRoomGuest &&
+          !spotifyCommandBusy.value &&
+          !spotifyNeedsAuthorization.value) {
+        refreshSpotify(silent: true);
+      }
+    } else {
+      _stopSpotifyTimers();
+    }
+  }
+
+  Future<void> controlSpotify(String action) async {
+    if (!canControlPlayer) return;
+    if (isClosed || _spotifySyncing || spotifyCommandBusy.value) return;
+    if (_retryAfter != null && DateTime.now().isBefore(_retryAfter!)) return;
+    spotifyCommandBusy.value = true;
+    spotifyError.value = '';
+    try {
+      await _controlPlayback(action);
+      // Give the active Spotify device time to publish its new state.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!isClosed) await refreshSpotify();
+    } on SpotifyPlaybackException catch (error) {
+      if (isClosed) return;
+      spotifyError.value = error.message;
+      spotifyNeedsAuthorization.value = error.needsAuthorization;
+      if (error.code == 'rate_limited') {
+        _retryAfter = DateTime.now().add(
+          Duration(seconds: error.retryAfter ?? 30),
+        );
+      }
+    } catch (_) {
+      if (!isClosed) {
+        spotifyError.value =
+            'Não foi possível controlar o Spotify. Tente novamente.';
+      }
+    } finally {
+      if (!isClosed) spotifyCommandBusy.value = false;
+    }
+  }
+
+  Future<void> refreshSpotify({bool silent = false}) async {
+    if (_spotifySyncing || isClosed) return;
+    if (_retryAfter != null && DateTime.now().isBefore(_retryAfter!)) return;
+    _spotifySyncing = true;
+    // Background synchronization keeps the current player and controls visible.
+    if (!silent || spotifyPlayback.value == null) {
+      spotifyLoading.value = true;
+      spotifyError.value = '';
+    }
+    try {
+      final playback = await _loadPlayback();
+      if (isClosed) return;
+      spotifyPlayback.value = playback;
+      spotifyError.value = '';
+      spotifyNeedsAuthorization.value = false;
+      final queueArtists = playback.queueArtists;
+      final artistsChanged = !listEquals(artistsDb, queueArtists);
+      if (artistsChanged) artistsDb.assignAll(queueArtists);
+      spotifyUpdatedAt.value = DateTime.now();
+      spotifyPositionMs.value = playback.progressMs.clamp(
+        0,
+        playback.current?.durationMs ?? 0,
+      );
+      _retryAfter = null;
+      if (!_hasImportedQueue && artistsDb.isNotEmpty) {
+        importQueueArtists();
+        _hasImportedQueue = true;
+      }
+      if (artistsChanged) updateSuggestions();
+    } on SpotifyPlaybackException catch (error) {
+      if (isClosed) return;
+      spotifyError.value = error.message;
+      spotifyNeedsAuthorization.value = error.needsAuthorization;
+      if (error.code == 'rate_limited') {
+        _retryAfter = DateTime.now().add(
+          Duration(seconds: error.retryAfter ?? 30),
+        );
+      }
+    } catch (_) {
+      if (!isClosed) {
+        spotifyError.value =
+            'Não foi possível consultar o Spotify. Tente novamente.';
+      }
+    } finally {
+      _spotifySyncing = false;
+      if (!isClosed) spotifyLoading.value = false;
+    }
+  }
+
+  Future<void> reconnectSpotify() async {
+    if (isRoomGuest) return;
+    try {
+      await SpotifyAuth.signIn();
+    } catch (_) {
+      if (!isClosed) {
+        spotifyError.value = 'Não foi possível abrir o login do Spotify.';
+      }
+    }
+  }
+
+  void onSearchFocus() {
+    showSuggestions.value = true;
+    updateSuggestions();
+  }
+
+  void onSearchChanged(String value) {
+    searchText.value = value;
+    updateSuggestions();
+  }
+
+  void onSearchSubmitted(String value) {
+    if (value.trim().isNotEmpty && !selectedArtists.contains(value.trim())) {
+      addArtist(value.trim());
+      searchController.clear();
+      searchText.value = '';
+      updateSuggestions();
+    }
+  }
+
+  void updateScreenSize(double width, double height) {
+    screenWidth.value = width;
+    screenHeight.value = height;
+  }
+
   @override
   void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopSpotifyTimers();
     searchController.dispose();
     searchFocusNode.dispose();
     super.onClose();
@@ -171,7 +272,7 @@ class HomeController extends GetxController {
     final query = searchText.value.trim().toLowerCase();
 
     if (query.isEmpty) {
-      // Show random artists when no search
+      // Suggestions come only from the user's queue.
       final available = artistsDb
           .where((artist) => !selectedArtists.contains(artist))
           .toList();
@@ -213,37 +314,13 @@ class HomeController extends GetxController {
     showToast('All artists cleared');
   }
 
-  void importPopularArtists() {
-    const popular = [
-      "Taylor Swift",
-      "Drake",
-      "The Weeknd",
-      "Ariana Grande",
-      "Bad Bunny",
-      "Billie Eilish",
-      "Dua Lipa",
-      "Post Malone",
-      "Olivia Rodrigo",
-      "SZA",
-      "Kendrick Lamar",
-      "Harry Styles",
-      "Ed Sheeran",
-      "Beyoncé",
-      "Rihanna",
-      "Travis Scott",
-      "Doja Cat",
-      "Bruno Mars",
-      "Lady Gaga",
-      "Justin Bieber",
-    ];
-
-    for (final artist in popular) {
+  void importQueueArtists() {
+    for (final artist in artistsDb) {
       if (!selectedArtists.contains(artist)) {
         selectedArtists.add(artist);
       }
     }
     updateSuggestions();
-    showToast('Popular artists added');
   }
 
   void clearSearch() {
@@ -261,7 +338,7 @@ class HomeController extends GetxController {
     final shuffled = List<String>.from(artistsDb)..shuffle();
     selectedArtists.value = shuffled.take(25).toList();
     updateSuggestions();
-    showToast('Sample selection shuffled');
+    showToast('Seleção da fila embaralhada');
   }
 
   void setNumBoards(int value) {
@@ -289,6 +366,7 @@ class HomeController extends GetxController {
   }
 
   void generateBoards() {
+    if (isRoomGuest || isRoom) return;
     if (selectedArtists.isEmpty) {
       showToast('Please add some artists first');
       return;
@@ -364,6 +442,16 @@ class HomeController extends GetxController {
     final board = boards[boardIndex];
     final updatedTiles = List<BingoTile>.from(board.tiles);
     final tile = updatedTiles[tileIndex];
+    if (!board.canMark) return;
+    if (isRoom) {
+      if (tile.type != BingoTileType.artist) return;
+      onRoomTileMark?.call(tileIndex, !tile.isMarked).catchError((Object _) {
+        if (!isClosed) {
+          showToast('Não foi possível salvar a marcação. Tente novamente.');
+        }
+      });
+      return;
+    }
 
     updatedTiles[tileIndex] = tile.copyWith(isMarked: !tile.isMarked);
 
@@ -372,6 +460,7 @@ class HomeController extends GetxController {
   }
 
   void clearBoardMarks(int boardIndex) {
+    if (isRoomGuest || isRoom) return;
     if (boardIndex >= boards.length) return;
 
     final board = boards[boardIndex];
@@ -385,6 +474,7 @@ class HomeController extends GetxController {
   }
 
   void shuffleBoard(int boardIndex) {
+    if (isRoomGuest || isRoom) return;
     if (boardIndex >= boards.length) return;
 
     final board = boards[boardIndex];

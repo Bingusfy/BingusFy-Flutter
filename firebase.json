@@ -1,0 +1,62 @@
+{
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "emulators": {
+        "auth": {
+            "port": 9099
+        },
+        "firestore": {
+            "port": 8081
+        },
+        "ui": {
+            "enabled": true,
+            "port": 4000
+        },
+        "singleProjectMode": true
+    },
+    "flutter": {
+        "platforms": {
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "bingusfy-rooms-20261008",
+                    "configurations": {
+                        "web": "1:257297466847:web:b7e936c1eb95ad8335b06a"
+                    }
+                }
+            }
+        }
+    },
+    "auth": {
+        "providers": {
+            "anonymous": true
+        }
+    },
+    "hosting": {
+        "site": "bingusfy-rooms-20261008",
+        "public": "build/web",
+        "ignore": [
+            "firebase.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "rewrites": [
+            {
+                "destination": "/index.html",
+                "source": "**"
+            }
+        ],
+        "headers": [
+            {
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "no-cache"
+                    }
+                ],
+                "source": "**"
+            }
+        ]
+    }
+}

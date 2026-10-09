@@ -1,4 +1,6 @@
-import 'package:bingo/modules/home/presents/home_page.dart';
+import 'package:bingo/modules/entry/presents/entry_page.dart';
+import 'package:bingo/modules/entry/widgets/spotify_gate.dart';
+import 'package:bingo/modules/rooms/presents/room_page.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -32,7 +34,35 @@ class Appwidget extends StatelessWidget {
           dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse},
         ),
         debugShowCheckedModeBanner: false,
-        routes: {'/': (context) => const HomePage()},
+        // A deep link must start with just its destination. The default initial
+        // stack also mounts '/', whose Spotify restore redirects room owners.
+        onGenerateInitialRoutes: (name) => [
+          if (name.startsWith('/room/'))
+            MaterialPageRoute(
+              settings: RouteSettings(name: name),
+              builder: (_) => RoomPage(roomId: name.substring(6)),
+            )
+          else
+            MaterialPageRoute(
+              settings: RouteSettings(name: name == '/home' ? '/home' : '/'),
+              builder: (_) =>
+                  name == '/home' ? const SpotifyGate() : const EntryPage(),
+            ),
+        ],
+        routes: {
+          '/': (context) => const EntryPage(),
+          '/home': (context) => const SpotifyGate(),
+        },
+        onGenerateRoute: (settings) {
+          final name = settings.name ?? '';
+          if (name.startsWith('/room/')) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => RoomPage(roomId: name.substring(6)),
+            );
+          }
+          return null;
+        },
       ),
     );
   }

@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function roomData(id) { return get(/databases/$(database)/documents/rooms/$(id)).data; }
+    function roomAfter(id) { return getAfter(/databases/$(database)/documents/rooms/$(id)).data; }
+    function member(id) {
+      return signedIn() && exists(/databases/$(database)/documents/rooms/$(id)/participants/$(request.auth.uid));
+    }
+    function memberAfter(id) {
+      return existsAfter(/databases/$(database)/documents/rooms/$(id)/participants/$(request.auth.uid));
+    }
+    function validSettings(d) {
+      return d.keys().hasAll(['gridSize','blankPercent','freeCenter'])
+        && d.keys().hasOnly(['gridSize','blankPercent','freeCenter'])
+        && d.gridSize in [3,4,5] && d.blankPercent is int
+        && d.blankPercent >= 0 && d.blankPercent <= 60 && d.freeCenter is bool;
+    }
+    function validPlayback(d) {
+      return d.keys().hasAll(['current','queue','isPlaying','progressMs','canControl'])
+        && d.keys().hasOnly(['current','queue','isPlaying','progressMs','canControl'])
+        && d.canControl == false && d.queue is list && d.queue.size() <= 80
+        && (d.isPlaying == null || d.isPlaying is bool) && d.progressMs is int && d.progressMs >= 0;
+    }
+    function validMark(d,i) {
+      return i >= d.marks.size() || d.marks[i] == false || d.cells[i] != '';
+    }
+    function validBoard(d,s,initial) {
+      let center = s.settings.freeCenter && d.gridSize in [3,5] ? (d.gridSize*d.gridSize - 1) / 2 : -1;
+      return d.keys().hasOnly(['gridSize','cells','marks','name']) && d.gridSize == s.settings.gridSize
+        && d.cells is list && d.marks is list && d.cells.size() == d.gridSize*d.gridSize
+        && d.marks.size() == d.cells.size() && d.marks.hasOnly([true,false])
+        && d.cells.toSet().difference(s.artists.toSet()).hasOnly(['','__BINGUS_FREE__'])
+        && (s.settings.blankPercent > 0 || !d.cells.hasAny(['']))
+        && d.cells.removeAll(['__BINGUS_FREE__']).size() == d.cells.size() - (center < 0 ? 0 : 1)
+        && (center < 0 || (d.cells[center] == '__BINGUS_FREE__' && d.marks[center] == true))
+        && (!initial || d.marks.removeAll([false]).size() == (center < 0 ? 0 : 1))
+        && validMark(d,0)
+        && validMark(d,1)
+        && validMark(d,2)
+        && validMark(d,3)
+        && validMark(d,4)
+        && validMark(d,5)
+        && validMark(d,6)
+        && validMark(d,7)
+        && validMark(d,8)
+        && validMark(d,9)
+        && validMark(d,10)
+        && validMark(d,11)
+        && validMark(d,12)
+        && validMark(d,13)
+        && validMark(d,14)
+        && validMark(d,15)
+        && validMark(d,16)
+        && validMark(d,17)
+        && validMark(d,18)
+        && validMark(d,19)
+        && validMark(d,20)
+        && validMark(d,21)
+        && validMark(d,22)
+        && validMark(d,23)
+        && validMark(d,24);
+    }
+    match /rooms/{id} {
+      allow get: if signedIn();
+      allow list,delete: if false;
+      allow create: if signedIn() && id.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasAll(['ownerUid','status','artists','settings','createdAt','syncedAt','playback'])
+        && request.resource.data.keys().hasOnly(['ownerUid','status','artists','settings','createdAt','syncedAt','playback'])
+        && request.resource.data.ownerUid == request.auth.uid && request.resource.data.status == 'open'
+        && request.resource.data.artists is list && request.resource.data.artists.size() > 0
+        && request.resource.data.artists.size() <= 200 && validSettings(request.resource.data.settings)
+        && request.resource.data.createdAt == request.time && request.resource.data.syncedAt == request.time
+        && validPlayback(request.resource.data.playback) && memberAfter(id);
+      allow update: if signedIn() && resource.data.ownerUid == request.auth.uid && resource.data.status == 'open'
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playback','syncedAt'])
+              && request.resource.data.syncedAt == request.time && validPlayback(request.resource.data.playback))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','closedAt'])
+              && request.resource.data.status == 'closed' && request.resource.data.closedAt == request.time));
+      match /participants/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || member(id));
+        allow list: if member(id);
+        allow create: if signedIn() && request.auth.uid == uid
+          && getAfter(/databases/$(database)/documents/rooms/$(id)).data.status == 'open'
+          && request.resource.data.keys().hasAll(['name','role','joinedAt'])
+          && request.resource.data.keys().hasOnly(['name','role','joinedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 40 && request.resource.data.joinedAt == request.time
+          && ((getAfter(/databases/$(database)/documents/rooms/$(id)).data.ownerUid == uid && request.resource.data.role == 'owner')
+            || (getAfter(/databases/$(database)/documents/rooms/$(id)).data.ownerUid != uid && request.resource.data.role == 'guest'
+                && existsAfter(/databases/$(database)/documents/rooms/$(id)/boards/$(uid))));
+        allow update: if false;
+        allow delete: if signedIn() && request.auth.uid == uid && roomData(id).ownerUid != uid
+          && !existsAfter(/databases/$(database)/documents/rooms/$(id)/boards/$(uid));
+      }
+      match /boards/{uid} {
+        allow get,list: if member(id);
+        allow create: if signedIn() && request.auth.uid == uid && memberAfter(id) && roomAfter(id).status == 'open'
+          && request.resource.data.name == getAfter(/databases/$(database)/documents/rooms/$(id)/participants/$(uid)).data.name
+          && validBoard(request.resource.data,roomAfter(id),true);
+        allow update: if signedIn() && request.auth.uid == uid && member(id) && roomData(id).status == 'open'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['marks'])
+          && validBoard(request.resource.data,roomData(id),false);
+        allow delete: if signedIn() && request.auth.uid == uid && roomData(id).ownerUid != uid
+          && !existsAfter(/databases/$(database)/documents/rooms/$(id)/participants/$(uid));
+      }
+    }
+    match /{document=**} { allow read,write: if false; }
+  }
+}
+

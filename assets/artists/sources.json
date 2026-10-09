@@ -1,0 +1,152 @@
+[
+  {
+    "name": "Taylor Swift",
+    "file": "taylor-swift.jpg",
+    "artistUrl": "https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab6761610000517412184bdd29403de54cb9d9c7"
+  },
+  {
+    "name": "The Weeknd",
+    "file": "the-weeknd.jpg",
+    "artistUrl": "https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174c1719ac9e6a75c1c25835018"
+  },
+  {
+    "name": "Dua Lipa",
+    "file": "dua-lipa.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051740c68f6c95232e716f0abee8d"
+  },
+  {
+    "name": "Bruno Mars",
+    "file": "bruno-mars.jpg",
+    "artistUrl": "https://open.spotify.com/artist/0du5cEVh5yTK9QJze8zA0C",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174c7688aad1bf03986934d7e26"
+  },
+  {
+    "name": "Rihanna",
+    "file": "rihanna.jpg",
+    "artistUrl": "https://open.spotify.com/artist/5pKCCKE2ajJHZ9KAiaK11H",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174cb565a8e684e3be458d329ac"
+  },
+  {
+    "name": "Adele",
+    "file": "adele.jpg",
+    "artistUrl": "https://open.spotify.com/artist/4dpARuHxo51G3z768sgnrY",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab6761610000517468f6e5892075d7f22615bd17"
+  },
+  {
+    "name": "Billie Eilish",
+    "file": "billie-eilish.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6qqNVTkY8uBg9cP3Jd7DAH",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051744a21b4760d2ecb7b0dcdc8da"
+  },
+  {
+    "name": "Ariana Grande",
+    "file": "ariana-grande.jpg",
+    "artistUrl": "https://open.spotify.com/artist/66CXWjxzNUsdJxJ2JdwvnR",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab6761610000517468412f2d0177a9ebc265ff58"
+  },
+  {
+    "name": "Ed Sheeran",
+    "file": "ed-sheeran.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6eUKZXaKkcviH0Ku9w2n3V",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab67616100005174d55c95ad400aed87da52daec"
+  },
+  {
+    "name": "Beyoncé",
+    "file": "beyonce.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6vWDO969PvNqNYHIOW5v0m",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051747eaa373538359164b843f7c0"
+  },
+  {
+    "name": "Drake",
+    "file": "drake.jpg",
+    "artistUrl": "https://open.spotify.com/artist/3TVXtAsR1Inumwj472S9r4",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051744293385d324db8558179afd9"
+  },
+  {
+    "name": "Kendrick Lamar",
+    "file": "kendrick-lamar.jpg",
+    "artistUrl": "https://open.spotify.com/artist/2YZyLoL8N0Wb9xBt1NhZWg",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab6761610000517439ba6dcd4355c03de0b50918"
+  },
+  {
+    "name": "Harry Styles",
+    "file": "harry-styles.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6KImCVD70vtIoJWnq6nGn3",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174e309f8c3056a59f20d0968ca"
+  },
+  {
+    "name": "Bad Bunny",
+    "file": "bad-bunny.jpg",
+    "artistUrl": "https://open.spotify.com/artist/4q3ewBCX7sLwd24euuV69X",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab6761610000517481f47f44084e0a09b5f0fa13"
+  },
+  {
+    "name": "Miley Cyrus",
+    "file": "miley-cyrus.jpg",
+    "artistUrl": "https://open.spotify.com/artist/5YGY8feqx7naU7z4HrwZM6",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174e6431a229c528350779bf77e"
+  },
+  {
+    "name": "Post Malone",
+    "file": "post-malone.jpg",
+    "artistUrl": "https://open.spotify.com/artist/246dkjvS1zLTtiykXe5h60",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab67616100005174e17c0aa1714a03d62b5ce4e0"
+  },
+  {
+    "name": "Coldplay",
+    "file": "coldplay.jpg",
+    "artistUrl": "https://open.spotify.com/artist/4gzpq5DPGxSnKTe4SA8HAU",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051741ba8fc5f5c73e7e9313cc6eb"
+  },
+  {
+    "name": "Imagine Dragons",
+    "file": "imagine-dragons.jpg",
+    "artistUrl": "https://open.spotify.com/artist/53XhwfbYqKCa1cC15pYq2q",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174ab47d8dae2b24f5afe7f9d38"
+  },
+  {
+    "name": "Anitta",
+    "file": "anitta.jpg",
+    "artistUrl": "https://open.spotify.com/artist/7FNnA9vBm6EKceENgCGRMb",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab67616100005174c971a5b58d274b9ae7c467af"
+  },
+  {
+    "name": "LUDMILLA",
+    "file": "ludmilla.jpg",
+    "artistUrl": "https://open.spotify.com/artist/3CDoRporvSjdzTrm99a3gi",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab67616100005174b2ad8d40cf07af85e87c54bc"
+  },
+  {
+    "name": "Pabllo Vittar",
+    "file": "pabllo-vittar.jpg",
+    "artistUrl": "https://open.spotify.com/artist/6tzRZ39aZlNqlUzQlkuhDV",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab676161000051743b4f066cf542935f22c858d9"
+  },
+  {
+    "name": "Claudia Leitte",
+    "file": "claudia-leitte.jpg",
+    "artistUrl": "https://open.spotify.com/artist/2OjoIDVPQKT9B7loZbPEfp",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174f124d80ad340b6e83abad60f"
+  },
+  {
+    "name": "Luísa Sonza",
+    "file": "luisa-sonza.jpg",
+    "artistUrl": "https://open.spotify.com/artist/4PzYKhC14sTJNEr0dzoo0d",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174d6ee3bc21789280f618fb618"
+  },
+  {
+    "name": "Caetano Veloso",
+    "file": "caetano-veloso.jpg",
+    "artistUrl": "https://open.spotify.com/artist/7HGNYPmbDrMkylWqeFCOIQ",
+    "imageUrl": "https://image-cdn-fa.spotifycdn.com/image/ab67616100005174cffb538293045411d2b51b8a"
+  },
+  {
+    "name": "Gilberto Gil",
+    "file": "gilberto-gil.jpg",
+    "artistUrl": "https://open.spotify.com/artist/7oEkUINVIj1Nr3Wnj8tzqr",
+    "imageUrl": "https://image-cdn-ak.spotifycdn.com/image/ab67616100005174d5bcd1f26a790abc630fb5d3"
+  }
+]

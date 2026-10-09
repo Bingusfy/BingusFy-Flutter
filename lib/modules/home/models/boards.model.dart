@@ -4,11 +4,15 @@ class BingoBoard {
   final int id;
   final List<BingoTile> tiles;
   final int gridSize;
+  final String? ownerName;
+  final bool canMark;
 
   const BingoBoard({
     required this.id,
     required this.tiles,
     required this.gridSize,
+    this.ownerName,
+    this.canMark = true,
   });
 
   BingoBoard copyWith({int? id, List<BingoTile>? tiles, int? gridSize}) {
@@ -16,6 +20,8 @@ class BingoBoard {
       id: id ?? this.id,
       tiles: tiles ?? this.tiles,
       gridSize: gridSize ?? this.gridSize,
+      ownerName: ownerName,
+      canMark: canMark,
     );
   }
 }

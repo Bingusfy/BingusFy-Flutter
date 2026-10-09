@@ -1,13 +1,19 @@
 import 'package:bingo/modules/home/models/boards.model.dart';
 import 'package:bingo/modules/home/models/tile.model.dart';
 import 'package:bingo/modules/home/presents/home_controller.dart';
+import 'package:bingo/modules/home/presents/widgets/spotify_playback_panel.dart';
+import 'package:bingo/modules/home/presents/widgets/home_design.dart';
+import 'package:bingo/modules/home/presents/widgets/spotify_mini_player.dart';
+import 'package:bingo/modules/rooms/presents/room_lobby_panel.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.homeController, this.roomPanel});
+  final HomeController? homeController;
+  final Widget? roomPanel;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -15,19 +21,63 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final HomeController controller;
+  late final String _controllerTag = 'home-${identityHashCode(this)}';
   bool _isInitializing = true;
+  final _scrollController = ScrollController();
+  final _mainPlayerKey = GlobalKey();
+  final _viewportKey = GlobalKey();
+  final _showMiniPlayer = ValueNotifier(false);
+  bool _visibilityCheckScheduled = false;
+
+  void _schedulePlayerVisibilityCheck() {
+    if (_visibilityCheckScheduled || !mounted) return;
+    _visibilityCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibilityCheckScheduled = false;
+      if (!mounted) return;
+      final player = _mainPlayerKey.currentContext?.findRenderObject();
+      final viewport = _viewportKey.currentContext?.findRenderObject();
+      if (player is! RenderBox ||
+          viewport is! RenderBox ||
+          !player.hasSize ||
+          !viewport.hasSize) {
+        return;
+      }
+      final playerBounds = player.localToGlobal(Offset.zero) & player.size;
+      final viewportBounds =
+          viewport.localToGlobal(Offset.zero) & viewport.size;
+      _showMiniPlayer.value = !playerBounds.overlaps(viewportBounds);
+    });
+  }
+
+  void _openMainPlayer() {
+    final playerContext = _mainPlayerKey.currentContext;
+    if (playerContext != null) {
+      Scrollable.ensureVisible(
+        playerContext,
+        duration: MediaQuery.of(context).disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  double _pageHorizontalPadding(double width) {
+    if (width < 640) return 16;
+    if (width < 1024) return 24;
+    return 32;
+  }
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_schedulePlayerVisibilityCheck);
     // Get the controller from GetIt and register it with GetX
-    controller = GetIt.I.get<HomeController>();
+    controller = widget.homeController ?? GetIt.I.get<HomeController>();
 
-    // Força a remoção de qualquer instância anterior e registra uma nova
-    if (Get.isRegistered<HomeController>()) {
-      Get.delete<HomeController>();
-    }
-    Get.put(controller);
+    // This page owns the lifecycle, including transitions from home into a room.
+    Get.put(controller, tag: _controllerTag, permanent: true);
 
     // Aguarda o próximo frame para garantir que o GetX esteja pronto
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -44,18 +94,47 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    _showMiniPlayer.dispose();
     // Remove o controller do GetX quando o widget for descartado
-    if (Get.isRegistered<HomeController>()) {
-      Get.delete<HomeController>();
+    if (Get.isRegistered<HomeController>(tag: _controllerTag)) {
+      Get.delete<HomeController>(tag: _controllerTag, force: true);
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Update screen dimensions in controller
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final size = MediaQuery.of(context).size;
+      controller.updateScreenSize(size.width, size.height);
+    });
+
+    _schedulePlayerVisibilityCheck();
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
-      body: _isInitializing ? _buildLoadingScreen() : _buildMainContent(),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          sliderTheme: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            inactiveTrackColor: const Color(0xFF2A3730),
+            activeTickMarkColor: Colors.transparent,
+            inactiveTickMarkColor: Colors.transparent,
+            tickMarkShape: SliderTickMarkShape.noTickMark,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayColor: const Color(0x141ED760),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        child: _isInitializing ? _buildLoadingScreen() : _buildMainContent(),
+      ),
     );
   }
 
@@ -64,33 +143,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Logo animado
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: HomeController.primaryBg,
-              border: Border.all(color: HomeController.primaryBorder, width: 2),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: HomeController.primaryColor.withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Text(
-                'BF',
-                style: TextStyle(
-                  color: HomeController.primaryColor,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+          const BingusBrandMark(size: 96),
           const SizedBox(height: 32),
 
           // Loading indicator
@@ -108,7 +161,7 @@ class _HomePageState extends State<HomePage> {
 
           // Texto de loading
           const Text(
-            'Carregando BingoFy...',
+            'Carregando BingusFy...',
             style: TextStyle(
               color: Color(0xFFD1D5DB),
               fontSize: 18,
@@ -139,91 +192,111 @@ class _HomePageState extends State<HomePage> {
               final isTablet =
                   constraints.maxWidth >= 640 && constraints.maxWidth < 1024;
 
-              return SingleChildScrollView(
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 1400),
-                    margin: EdgeInsets.symmetric(
-                      horizontal: isMobile
-                          ? 16
-                          : isTablet
-                          ? 24
-                          : 32,
-                    ),
-                    padding: EdgeInsets.all(
-                      isMobile
-                          ? 16
-                          : isTablet
-                          ? 24
-                          : 32,
-                    ),
-                    child: Column(
-                      children: [
-                        // Background gradients overlay
-                        Stack(
-                          children: [
-                            // Gradient backgrounds (only on larger screens)
-                            if (!isMobile) ...[
-                              Positioned(
-                                top: -100,
-                                left: -200,
-                                child: Container(
-                                  width: 600,
-                                  height: 160,
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        HomeController.primaryColor.withOpacity(
-                                          0.2,
-                                        ),
-                                        Colors.transparent,
-                                      ],
-                                      stops: const [0.0, 0.6],
+              return NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  _schedulePlayerVisibilityCheck();
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  key: _viewportKey,
+                  controller: _scrollController,
+                  child: Center(
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _pageHorizontalPadding(
+                          constraints.maxWidth,
+                        ),
+                        vertical: isMobile
+                            ? 16
+                            : isTablet
+                            ? 24
+                            : 32,
+                      ),
+                      child: Column(
+                        children: [
+                          // Background gradients overlay
+                          Stack(
+                            children: [
+                              // Gradient backgrounds (only on larger screens)
+                              if (!isMobile) ...[
+                                Positioned(
+                                  top: -100,
+                                  left: -200,
+                                  child: Container(
+                                    width: 600,
+                                    height: 160,
+                                    decoration: BoxDecoration(
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          HomeController.primaryColor
+                                              .withValues(alpha: 0.2),
+                                          Colors.transparent,
+                                        ],
+                                        stops: const [0.0, 0.6],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                top: -100,
-                                right: -200,
-                                child: Container(
-                                  width: 500,
-                                  height: 160,
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        HomeController.primaryColor.withOpacity(
-                                          0.1,
-                                        ),
-                                        Colors.transparent,
-                                      ],
-                                      stops: const [0.0, 0.6],
+                                Positioned(
+                                  top: -100,
+                                  right: -200,
+                                  child: Container(
+                                    width: 500,
+                                    height: 160,
+                                    decoration: BoxDecoration(
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          HomeController.primaryColor
+                                              .withValues(alpha: 0.1),
+                                          Colors.transparent,
+                                        ],
+                                        stops: const [0.0, 0.6],
+                                      ),
                                     ),
                                   ),
                                 ),
+                              ],
+
+                              // Main content
+                              Column(
+                                children: [
+                                  // Hero/Search section
+                                  const HomeIntro(),
+                                  widget.roomPanel ??
+                                      RoomLobbyPanel(controller: controller),
+                                  NotificationListener<
+                                    SizeChangedLayoutNotification
+                                  >(
+                                    onNotification: (_) {
+                                      _schedulePlayerVisibilityCheck();
+                                      return false;
+                                    },
+                                    child: SizeChangedLayoutNotifier(
+                                      child: SpotifyPlaybackPanel(
+                                        controller: controller,
+                                        playerVisibilityKey: _mainPlayerKey,
+                                      ),
+                                    ),
+                                  ),
+                                  if (!controller.isRoom)
+                                    _buildMainSection(context),
+                                  SizedBox(
+                                    height: isMobile
+                                        ? 20
+                                        : isTablet
+                                        ? 28
+                                        : 32,
+                                  ),
+
+                                  // Boards section
+                                  _buildBoardsSection(),
+                                ],
                               ),
                             ],
-
-                            // Main content
-                            Column(
-                              children: [
-                                // Hero/Search section
-                                _buildMainSection(context),
-                                SizedBox(
-                                  height: isMobile
-                                      ? 20
-                                      : isTablet
-                                      ? 28
-                                      : 32,
-                                ),
-
-                                // Boards section
-                                _buildBoardsSection(),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -232,6 +305,29 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
 
+        ValueListenableBuilder<bool>(
+          valueListenable: _showMiniPlayer,
+          builder: (context, show, _) {
+            if (!show) return const SizedBox.shrink();
+            return Obx(() {
+              if (controller.spotifyPlayback.value?.current == null) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  _pageHorizontalPadding(MediaQuery.sizeOf(context).width),
+                  8,
+                  _pageHorizontalPadding(MediaQuery.sizeOf(context).width),
+                  12,
+                ),
+                child: SpotifyMiniPlayer(
+                  controller: controller,
+                  onOpenPlayer: _openMainPlayer,
+                ),
+              );
+            });
+          },
+        ),
         // Footer
         _buildFooter(),
       ],
@@ -248,15 +344,17 @@ class _HomePageState extends State<HomePage> {
         return Container(
           height: isMobile ? 56 : 64,
           decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0A).withOpacity(0.7),
+            color: const Color(0xFF0A0A0A).withValues(alpha: 0.7),
             border: const Border(
               bottom: BorderSide(color: Color(0x1AFFFFFF), width: 1),
             ),
           ),
           child: Center(
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 1400),
-              margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
+              width: double.infinity,
+              margin: EdgeInsets.symmetric(
+                horizontal: _pageHorizontalPadding(constraints.maxWidth),
+              ),
               child: isMobile
                   ? _buildMobileHeader()
                   : _buildDesktopHeader(isTablet),
@@ -270,26 +368,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMobileHeader() {
     return Row(
       children: [
-        // Logo compacto
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: HomeController.primaryBg,
-            border: Border.all(color: HomeController.primaryBorder),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Center(
-            child: Text(
-              'BF',
-              style: TextStyle(
-                color: HomeController.primaryColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
+        const BingusBrandMark(size: 32),
         const SizedBox(width: 8),
         const Expanded(
           child: Text(
@@ -302,14 +381,15 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         // Menu hamburger ou ação principal
-        IconButton(
-          onPressed: controller.shuffleSample,
-          icon: const Icon(Icons.shuffle, size: 20),
-          style: IconButton.styleFrom(
-            foregroundColor: const Color(0xFFD1D5DB),
-            side: const BorderSide(color: Color(0x1AFFFFFF)),
+        if (!controller.isRoom)
+          IconButton(
+            onPressed: controller.shuffleSample,
+            icon: const Icon(Icons.shuffle, size: 20),
+            style: IconButton.styleFrom(
+              foregroundColor: const Color(0xFFD1D5DB),
+              side: const BorderSide(color: Color(0x1AFFFFFF)),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -317,26 +397,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildDesktopHeader(bool isTablet) {
     return Row(
       children: [
-        // Logo
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: HomeController.primaryBg,
-            border: Border.all(color: HomeController.primaryBorder),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Center(
-            child: Text(
-              'BF',
-              style: TextStyle(
-                color: HomeController.primaryColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
+        const BingusBrandMark(size: 36),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -344,60 +405,66 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Bingofy',
-                style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 14),
+                'BingusFy',
+                style: TextStyle(
+                  color: Color(0xFFF1F5F2),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.4,
+                ),
               ),
               if (!isTablet)
                 const Text(
-                  'Pesquise artistas, selecione e gere painéis',
-                  style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                  'Seu ritmo. Seu jogo.',
+                  style: TextStyle(color: HomeDesign.muted, fontSize: 12),
                 ),
             ],
           ),
         ),
 
         // Actions
-        Row(
-          children: [
-            if (isTablet)
-              IconButton(
-                onPressed: controller.shuffleSample,
-                icon: const Icon(Icons.shuffle, size: 18),
-                style: IconButton.styleFrom(
-                  foregroundColor: const Color(0xFFD1D5DB),
-                  side: const BorderSide(color: Color(0x1AFFFFFF)),
-                ),
-              )
-            else ...[
-              TextButton.icon(
-                onPressed: controller.shuffleSample,
-                icon: const Icon(Icons.shuffle, size: 16),
-                label: const Text('Artistas aleatórios'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFD1D5DB),
-                  side: const BorderSide(color: Color(0x1AFFFFFF)),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+        if (!controller.isRoom)
+          Row(
+            children: [
+              if (isTablet)
+                IconButton(
+                  onPressed: controller.shuffleSample,
+                  icon: const Icon(Icons.shuffle, size: 18),
+                  style: IconButton.styleFrom(
+                    foregroundColor: const Color(0xFFD1D5DB),
+                    side: const BorderSide(color: Color(0x1AFFFFFF)),
+                  ),
+                )
+              else ...[
+                TextButton.icon(
+                  onPressed: controller.shuffleSample,
+                  icon: const Icon(Icons.shuffle, size: 16),
+                  label: const Text('Artistas aleatórios'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFD1D5DB),
+                    side: const BorderSide(color: Color(0x1AFFFFFF)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.info_outline, size: 16),
-                label: const Text('Como funciona'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF9CA3AF),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.info_outline, size: 16),
+                  label: const Text('Como funciona'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF9CA3AF),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
+          ),
       ],
     );
   }
@@ -440,240 +507,231 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSearchSection() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 640;
+    return Obx(() {
+      return Container(
+        decoration: HomeDesign.surface(),
+        padding: EdgeInsets.all(controller.isMobile ? 20 : 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            controller.isMobile
+                ? _buildMobileSearchHeader()
+                : _buildDesktopSearchHeader(),
+            SizedBox(height: controller.isMobile ? 10 : 12),
 
-        return Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0x1AFFFFFF)),
-            borderRadius: BorderRadius.circular(12),
-            color: const Color(0x99262626),
-          ),
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              isMobile
-                  ? _buildMobileSearchHeader()
-                  : _buildDesktopSearchHeader(),
-              SizedBox(height: isMobile ? 10 : 12),
-
-              // Search input
-              Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0x1AFFFFFF)),
-                      borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFF0A0A0A),
-                    ),
-                    child: TextField(
-                      controller: controller.searchController,
-                      focusNode: controller.searchFocusNode,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isMobile ? 16 : 14,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: isMobile
-                            ? 'Pesquise artistas...'
-                            : 'Pesquise artistas ou pressione Enter para adicionar…',
-                        hintStyle: const TextStyle(color: Color(0xFF6B7280)),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF9CA3AF),
-                          size: 20,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: isMobile ? 12 : 10,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Suggestions
-                  Obx(() {
-                    if (!controller.showSuggestions.value ||
-                        controller.suggestions.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-
-                    return Positioned(
-                      top: isMobile ? 52 : 50,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxHeight: isMobile ? 200 : 288,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xF50A0A0A),
-                          border: Border.all(color: const Color(0x1AFFFFFF)),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          itemCount: controller.suggestions.length,
-                          itemBuilder: (context, index) {
-                            final artist = controller.suggestions[index];
-                            return ListTile(
-                              title: Text(
-                                artist,
-                                style: TextStyle(
-                                  color: const Color(0xFFE5E7EB),
-                                  fontSize: isMobile ? 16 : 14,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                              trailing: const Icon(
-                                Icons.add,
-                                color: Color(0xFF9CA3AF),
-                                size: 16,
-                              ),
-                              onTap: () => controller.addArtist(artist),
-                              dense: !isMobile,
-                              hoverColor: const Color(0x0DFFFFFF),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-              SizedBox(height: isMobile ? 12 : 16),
-
-              // Selected artists header
-              isMobile
-                  ? _buildMobileArtistsHeader()
-                  : _buildDesktopArtistsHeader(),
-              SizedBox(height: isMobile ? 6 : 8),
-
-              // Selected artists display
-              Obx(() {
-                if (controller.selectedArtists.isEmpty) {
-                  return Container(
-                    height: isMobile ? 48 : 44,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0x1AFFFFFF)),
-                      borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFF0A0A0A),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_upward,
-                          color: Color(0xFF6B7280),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            isMobile
-                                ? 'Adicione artistas acima.'
-                                : 'Comece adicionando artistas da pesquisa acima.',
-                            style: TextStyle(
-                              color: const Color(0xFF6B7280),
-                              fontSize: isMobile ? 14 : 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return Container(
-                  constraints: BoxConstraints(minHeight: isMobile ? 48 : 44),
+            // Search input
+            Column(
+              children: [
+                Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0x1AFFFFFF)),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     color: const Color(0xFF0A0A0A),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  child: Wrap(
-                    spacing: isMobile ? 6 : 8,
-                    runSpacing: isMobile ? 6 : 8,
-                    children: controller.selectedArtists
-                        .map((artist) => _buildArtistChip(artist, isMobile))
-                        .toList(),
+                  child: TextField(
+                    controller: controller.searchController,
+                    focusNode: controller.searchFocusNode,
+                    onTap: () => controller.onSearchFocus(),
+                    onChanged: (value) => controller.onSearchChanged(value),
+                    onSubmitted: (value) => controller.onSearchSubmitted(value),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: controller.isMobile ? 16 : 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: controller.isMobile
+                          ? 'Pesquise artistas...'
+                          : 'Pesquise artistas ou pressione Enter para adicionar…',
+                      hintStyle: const TextStyle(color: HomeDesign.muted),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF9CA3AF),
+                        size: 20,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Suggestions
+                Obx(() {
+                  if (!controller.showSuggestions.value ||
+                      controller.suggestions.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxHeight: controller.isMobile ? 200 : 288,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF50A0A0A),
+                        border: Border.all(color: const Color(0x1AFFFFFF)),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: controller.suggestions.length,
+                        itemBuilder: (context, index) {
+                          final artist = controller.suggestions[index];
+                          return ListTile(
+                            title: Text(
+                              artist,
+                              style: TextStyle(
+                                color: const Color(0xFFE5E7EB),
+                                fontSize: controller.isMobile ? 16 : 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            trailing: const Icon(
+                              Icons.add,
+                              color: Color(0xFF9CA3AF),
+                              size: 16,
+                            ),
+                            onTap: () => controller.addArtist(artist),
+                            dense: !controller.isMobile,
+                            hoverColor: const Color(0x0DFFFFFF),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+            SizedBox(height: controller.isMobile ? 12 : 16),
+
+            // Selected artists header
+            controller.isMobile
+                ? _buildMobileArtistsHeader()
+                : _buildDesktopArtistsHeader(),
+            SizedBox(height: controller.isMobile ? 6 : 8),
+
+            // Selected artists display
+            Obx(() {
+              if (controller.selectedArtists.isEmpty) {
+                return Container(
+                  height: controller.isMobile ? 48 : 44,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0x1AFFFFFF)),
+                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFF0A0A0A),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_upward,
+                        color: HomeDesign.muted,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          controller.isMobile
+                              ? 'Adicione artistas acima.'
+                              : 'Comece adicionando artistas da pesquisa acima.',
+                          style: TextStyle(
+                            color: HomeDesign.muted,
+                            fontSize: controller.isMobile ? 14 : 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
-              }),
-            ],
-          ),
-        );
-      },
-    );
+              }
+
+              return Container(
+                width: double.infinity,
+                constraints: BoxConstraints(
+                  minHeight: controller.isMobile ? 48 : 44,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0x1AFFFFFF)),
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF0A0A0A),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Wrap(
+                  spacing: controller.isMobile ? 6 : 8,
+                  runSpacing: controller.isMobile ? 6 : 8,
+                  children: controller.selectedArtists
+                      .map(
+                        (artist) =>
+                            _buildArtistChip(artist, controller.isMobile),
+                      )
+                      .toList(),
+                ),
+              );
+            }),
+          ],
+        ),
+      );
+    });
   }
 
-  Widget _buildMobileSearchHeader() {
+  Widget _buildMobileSearchHeader() =>
+      _buildArtistsSectionHeading(compact: true);
+  Widget _buildDesktopSearchHeader() => _buildArtistsSectionHeading();
+  Widget _buildArtistsSectionHeading({bool compact = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Sua seleção de artistas',
+              style: TextStyle(
+                fontSize: compact ? 20 : 23,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.5,
+                color: const Color(0xFFF1F5F2),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: HomeController.primaryBg,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0x261ED760)),
+              ),
+              child: Text(
+                '${controller.selectedArtists.length} selecionados',
+                style: const TextStyle(
+                  color: HomeController.primaryColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         const Text(
-          'Crie seu grupo',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
+          'Adicione da fila ou encontre um artista para entrar no jogo.',
+          style: TextStyle(color: HomeDesign.muted, fontSize: 12, height: 1.6),
         ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF262626),
-            border: Border.all(color: HomeController.primaryBorder),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text(
-            '#1ED760',
-            style: TextStyle(color: HomeController.primaryColor, fontSize: 10),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDesktopSearchHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          'Crie seu grupo de artistas',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF262626),
-            border: Border.all(color: HomeController.primaryBorder),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text(
-            '#1ED760',
-            style: TextStyle(color: HomeController.primaryColor, fontSize: 10),
-          ),
-        ),
+        const SizedBox(height: 8),
       ],
     );
   }
@@ -691,7 +749,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             Expanded(
               child: TextButton(
-                onPressed: controller.importPopularArtists,
+                onPressed: controller.artistsDb.isEmpty
+                    ? null
+                    : controller.importQueueArtists,
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFFD1D5DB),
                   side: const BorderSide(color: Color(0x1AFFFFFF)),
@@ -699,9 +759,10 @@ class _HomePageState extends State<HomePage> {
                     horizontal: 8,
                     vertical: 8,
                   ),
-                  minimumSize: Size.zero,
+                  minimumSize: const Size(0, 44),
+                  visualDensity: VisualDensity.standard,
                 ),
-                child: const Text('Populares', style: TextStyle(fontSize: 12)),
+                child: const Text('Da fila', style: TextStyle(fontSize: 12)),
               ),
             ),
             const SizedBox(width: 8),
@@ -715,7 +776,8 @@ class _HomePageState extends State<HomePage> {
                     horizontal: 8,
                     vertical: 8,
                   ),
-                  minimumSize: Size.zero,
+                  minimumSize: const Size(0, 44),
+                  visualDensity: VisualDensity.standard,
                 ),
                 child: const Text('Limpar', style: TextStyle(fontSize: 12)),
               ),
@@ -727,8 +789,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDesktopArtistsHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
       children: [
         const Text(
           'Artistas selecionados',
@@ -737,18 +802,21 @@ class _HomePageState extends State<HomePage> {
         Row(
           children: [
             TextButton(
-              onPressed: controller.importPopularArtists,
+              onPressed: controller.artistsDb.isEmpty
+                  ? null
+                  : controller.importQueueArtists,
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFFD1D5DB),
                 side: const BorderSide(color: Color(0x1AFFFFFF)),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 14,
+                  vertical: 10,
                 ),
-                minimumSize: Size.zero,
+                minimumSize: const Size(0, 40),
+                visualDensity: VisualDensity.standard,
               ),
               child: const Text(
-                'Adicionar artistas populares',
+                'Adicionar artistas da fila',
                 style: TextStyle(fontSize: 12),
               ),
             ),
@@ -759,10 +827,11 @@ class _HomePageState extends State<HomePage> {
                 foregroundColor: const Color(0xFFDCAA8C),
                 side: const BorderSide(color: Color(0x1AFFFFFF)),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 14,
+                  vertical: 10,
                 ),
-                minimumSize: Size.zero,
+                minimumSize: const Size(0, 40),
+                visualDensity: VisualDensity.standard,
               ),
               child: const Text('Limpar tudo', style: TextStyle(fontSize: 12)),
             ),
@@ -778,9 +847,9 @@ class _HomePageState extends State<HomePage> {
         maxWidth: isMobile ? 200 : 180, // Limita a largura máxima
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF262626),
-        border: Border.all(color: const Color(0x1AFFFFFF)),
-        borderRadius: BorderRadius.circular(6),
+        color: const Color(0xFF1C3023),
+        border: Border.all(color: const Color(0x301ED760)),
+        borderRadius: BorderRadius.circular(30),
       ),
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 8 : 10,
@@ -790,8 +859,8 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.person,
-            color: const Color(0xFF9CA3AF),
+            Icons.music_note_rounded,
+            color: HomeController.primaryColor,
             size: isMobile ? 16 : 14,
           ),
           SizedBox(width: isMobile ? 8 : 6),
@@ -811,7 +880,7 @@ class _HomePageState extends State<HomePage> {
             onTap: () => controller.removeArtist(artist),
             child: Icon(
               Icons.close,
-              color: const Color(0xFF6B7280),
+              color: HomeDesign.muted,
               size: isMobile ? 18 : 14,
             ),
           ),
@@ -826,17 +895,13 @@ class _HomePageState extends State<HomePage> {
         final isMobile = constraints.maxWidth < 640;
 
         return Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0x1AFFFFFF)),
-            borderRadius: BorderRadius.circular(12),
-            color: const Color(0x99262626),
-          ),
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: HomeDesign.surface(),
+          padding: EdgeInsets.all(isMobile ? 20 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Opções de tabelas',
+                'Personalize o jogo',
                 style: TextStyle(
                   fontSize: isMobile ? 16 : 18,
                   fontWeight: FontWeight.w600,
@@ -883,9 +948,9 @@ class _HomePageState extends State<HomePage> {
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
           ),
           style: ElevatedButton.styleFrom(
-            fixedSize: const Size(double.maxFinite, 48),
+            fixedSize: const Size(double.maxFinite, 52),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             backgroundColor: HomeController.primaryColor,
             foregroundColor: Colors.black,
@@ -904,7 +969,7 @@ class _HomePageState extends State<HomePage> {
               side: const BorderSide(color: Color(0x1AFFFFFF)),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -927,7 +992,7 @@ class _HomePageState extends State<HomePage> {
             style: ElevatedButton.styleFrom(
               fixedSize: const Size(double.maxFinite, 40),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               backgroundColor: HomeController.primaryColor,
               foregroundColor: Colors.black,
@@ -1044,7 +1109,7 @@ class _HomePageState extends State<HomePage> {
                               ? HomeController.primaryBorder
                               : const Color(0x1AFFFFFF),
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
                         child: Text(
@@ -1075,11 +1140,13 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Azulejos em branco',
-                style: TextStyle(
-                  color: const Color(0xFFD1D5DB),
-                  fontSize: isMobile ? 16 : 14,
+              Expanded(
+                child: Text(
+                  'Espaços em branco',
+                  style: TextStyle(
+                    color: const Color(0xFFD1D5DB),
+                    fontSize: isMobile ? 16 : 14,
+                  ),
                 ),
               ),
               Text(
@@ -1101,9 +1168,9 @@ class _HomePageState extends State<HomePage> {
             onChanged: (value) => controller.setBlankPercent(value.round()),
           ),
           Text(
-            'As tabelas incluirão aleatoriamente azulejos em branco para variar a dificuldade.',
+            'Distribua espaços livres para variar o desafio.',
             style: TextStyle(
-              color: const Color(0xFF6B7280),
+              color: HomeDesign.muted,
               fontSize: isMobile ? 14 : 12,
             ),
           ),
@@ -1174,23 +1241,25 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Tabelas',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tabelas',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Toque nos artistas para marcar',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-            ),
-          ],
+              const SizedBox(height: 4),
+              const Text(
+                'Toque nos artistas para marcar',
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1211,7 +1280,7 @@ class _HomePageState extends State<HomePage> {
         const Flexible(
           child: Text(
             'Clique nos artistas para marcar enquanto joga',
-            style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+            style: TextStyle(color: HomeDesign.muted, fontSize: 12),
             textAlign: TextAlign.right,
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
@@ -1223,12 +1292,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildEmptyState() {
     return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0x1AFFFFFF)),
-        borderRadius: BorderRadius.circular(12),
-        color: const Color(0x80262626),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: controller.isMobile ? 24 : 40,
+        vertical: 40,
       ),
+      decoration: HomeDesign.surface(),
       child: Column(
         children: [
           Container(
@@ -1247,7 +1316,8 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Nenhuma placa ainda',
+            'Nenhuma tabela adicionada',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -1257,6 +1327,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 4),
           const Text(
             'Pesquise e adicione artistas, ajuste as opções e, em seguida, gere tabelas.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
           ),
         ],
@@ -1288,21 +1359,24 @@ class _HomePageState extends State<HomePage> {
           childAspectRatio = 1.0;
         }
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
-            mainAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
-            childAspectRatio: childAspectRatio,
-          ),
-          itemCount: controller.boards.length,
-          itemBuilder: (context, index) {
-            final board = controller.boards[index];
-            return _buildBoardCard(board, index);
-          },
-        );
+        return Obx(() {
+          final boards = controller.boards.toList();
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
+              mainAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemCount: boards.length,
+            itemBuilder: (context, index) {
+              final board = boards[index];
+              return _buildBoardCard(board, index);
+            },
+          );
+        });
       },
     );
   }
@@ -1312,111 +1386,150 @@ class _HomePageState extends State<HomePage> {
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 300;
 
-        return NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            // Intercepta e consome o scroll dentro da tabela
-            return true;
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0x1AFFFFFF)),
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0x80262626),
-            ),
-            padding: EdgeInsets.all(isMobile ? 12 : 16),
-            child: Column(
-              children: [
-                // Board header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Card ${board.id}',
-                      style: TextStyle(
-                        color: const Color(0xFF9CA3AF),
-                        fontSize: isMobile ? 16 : 14,
+        return Semantics(
+          container: true,
+          label: 'Tabela de ${board.ownerName ?? board.id}',
+          explicitChildNodes: true,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              // Intercepta e consome o scroll dentro da tabela
+              return true;
+            },
+            child: Container(
+              decoration: HomeDesign.surface(),
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
+              child: Column(
+                children: [
+                  // Board header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          board.ownerName == null
+                              ? 'Tabela ${board.id}'
+                              : 'Tabela · ${board.ownerName}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: const Color(0xFF9CA3AF),
+                            fontSize: isMobile ? 16 : 14,
+                          ),
+                        ),
                       ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () =>
-                              controller.clearBoardMarks(boardIndex),
-                          icon: Icon(Icons.clear, size: isMobile ? 18 : 16),
-                          style: IconButton.styleFrom(
-                            side: const BorderSide(color: Color(0x1AFFFFFF)),
-                            foregroundColor: Colors.white,
-                            fixedSize: Size(
-                              isMobile ? 36 : 32,
-                              isMobile ? 36 : 32,
+                      if (controller.isRoom && board.canMark)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: HomeController.primaryBg,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: HomeController.primaryBorder,
+                            ),
+                          ),
+                          child: const Text(
+                            'Sua tabela',
+                            style: TextStyle(
+                              color: HomeController.primaryColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        SizedBox(width: isMobile ? 6 : 4),
-                        IconButton(
-                          onPressed: () => controller.shuffleBoard(boardIndex),
-                          icon: Icon(Icons.casino, size: isMobile ? 18 : 16),
-                          style: IconButton.styleFrom(
-                            side: const BorderSide(color: Color(0x1AFFFFFF)),
-                            foregroundColor: Colors.white,
-                            fixedSize: Size(
-                              isMobile ? 36 : 32,
-                              isMobile ? 36 : 32,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                SizedBox(height: isMobile ? 8 : 12),
-
-                // Board grid com scroll próprio e interceptação de eventos
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, gridConstraints) {
-                      // Calcula o tamanho necessário para a grid
-                      final spacingSize = isMobile ? 4.0 : 6.0;
-                      final tileSize =
-                          (gridConstraints.maxWidth -
-                              (board.gridSize - 1) * spacingSize) /
-                          board.gridSize;
-                      final totalHeight =
-                          tileSize * board.gridSize +
-                          (board.gridSize - 1) * spacingSize;
-
-                      return SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: SizedBox(
-                          height: totalHeight > gridConstraints.maxHeight
-                              ? totalHeight
-                              : gridConstraints.maxHeight,
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: board.gridSize,
-                                  crossAxisSpacing: spacingSize,
-                                  mainAxisSpacing: spacingSize,
+                      if (!controller.isRoom)
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () =>
+                                  controller.clearBoardMarks(boardIndex),
+                              icon: Icon(Icons.clear, size: isMobile ? 18 : 16),
+                              style: IconButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0x1AFFFFFF),
                                 ),
-                            itemCount: board.tiles.length,
-                            itemBuilder: (context, tileIndex) {
-                              final tile = board.tiles[tileIndex];
-                              return _buildBoardTile(
-                                tile,
-                                boardIndex,
-                                tileIndex,
-                                isMobile,
-                              );
-                            },
-                          ),
+                                foregroundColor: Colors.white,
+                                fixedSize: Size(
+                                  isMobile ? 36 : 32,
+                                  isMobile ? 36 : 32,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: isMobile ? 6 : 4),
+                            IconButton(
+                              onPressed: () =>
+                                  controller.shuffleBoard(boardIndex),
+                              icon: Icon(
+                                Icons.casino,
+                                size: isMobile ? 18 : 16,
+                              ),
+                              style: IconButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0x1AFFFFFF),
+                                ),
+                                foregroundColor: Colors.white,
+                                fixedSize: Size(
+                                  isMobile ? 36 : 32,
+                                  isMobile ? 36 : 32,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                    ],
                   ),
-                ),
-              ],
+                  SizedBox(height: isMobile ? 8 : 12),
+
+                  // Board grid com scroll próprio e interceptação de eventos
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, gridConstraints) {
+                        // Calcula o tamanho necessário para a grid
+                        final spacingSize = isMobile ? 4.0 : 6.0;
+                        final tileSize =
+                            (gridConstraints.maxWidth -
+                                (board.gridSize - 1) * spacingSize) /
+                            board.gridSize;
+                        final totalHeight =
+                            tileSize * board.gridSize +
+                            (board.gridSize - 1) * spacingSize;
+
+                        return SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: SizedBox(
+                            height: totalHeight > gridConstraints.maxHeight
+                                ? totalHeight
+                                : gridConstraints.maxHeight,
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: board.gridSize,
+                                    crossAxisSpacing: spacingSize,
+                                    mainAxisSpacing: spacingSize,
+                                  ),
+                              itemCount: board.tiles.length,
+                              itemBuilder: (context, tileIndex) {
+                                final tile = board.tiles[tileIndex];
+                                return _buildBoardTile(
+                                  tile,
+                                  boardIndex,
+                                  tileIndex,
+                                  isMobile,
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1430,28 +1543,40 @@ class _HomePageState extends State<HomePage> {
     int tileIndex, [
     bool isMobile = false,
   ]) {
-    return GestureDetector(
-      onTap: () => controller.toggleTileMark(boardIndex, tileIndex),
-      child: Container(
-        constraints: BoxConstraints(
-          minHeight: isMobile ? 60 : 80, // Altura mínima garantida
-        ),
-        decoration: BoxDecoration(
-          color: tile.isMarked
-              ? HomeController.primaryBg
-              : tile.type == BingoTileType.free
-              ? HomeController.primaryBg
-              : null,
-          border: Border.all(
-            color: tile.isMarked
-                ? HomeController.primaryBorder
-                : tile.type == BingoTileType.free
-                ? HomeController.primaryBorder
-                : const Color(0x1AFFFFFF),
+    final canMark =
+        controller.boards[boardIndex].canMark &&
+        tile.type == BingoTileType.artist;
+    return Semantics(
+      button: true,
+      enabled: canMark,
+      toggled: tile.isMarked,
+      excludeSemantics: true,
+      label: tile.content?.isNotEmpty == true ? tile.content : 'Espaço vazio',
+      child: GestureDetector(
+        onTap: canMark
+            ? () => controller.toggleTileMark(boardIndex, tileIndex)
+            : null,
+        child: Container(
+          constraints: BoxConstraints(
+            minHeight: isMobile ? 60 : 80, // Altura mínima garantida
           ),
-          borderRadius: BorderRadius.circular(8),
+          decoration: BoxDecoration(
+            color: tile.isMarked
+                ? HomeController.primaryBg
+                : tile.type == BingoTileType.free
+                ? HomeController.primaryBg
+                : null,
+            border: Border.all(
+              color: tile.isMarked
+                  ? HomeController.primaryBorder
+                  : tile.type == BingoTileType.free
+                  ? HomeController.primaryBorder
+                  : const Color(0x1AFFFFFF),
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: _buildTileContent(tile, isMobile),
         ),
-        child: _buildTileContent(tile, isMobile),
       ),
     );
   }
@@ -1494,14 +1619,14 @@ class _HomePageState extends State<HomePage> {
             children: [
               Icon(
                 Icons.music_note,
-                color: const Color(0xFF6B7280),
+                color: HomeDesign.muted,
                 size: isMobile ? 12 : 14,
               ),
               SizedBox(height: isMobile ? 1 : 2),
               Text(
                 'Em branco',
                 style: TextStyle(
-                  color: const Color(0xFF6B7280),
+                  color: HomeDesign.muted,
                   fontSize: isMobile ? 8 : 10,
                 ),
               ),
@@ -1555,12 +1680,12 @@ class _HomePageState extends State<HomePage> {
             border: Border(top: BorderSide(color: Color(0x1AFFFFFF), width: 1)),
           ),
           padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 16 : 32,
+            horizontal: _pageHorizontalPadding(constraints.maxWidth),
             vertical: isMobile ? 16 : 24,
           ),
           child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 1400),
+            child: SizedBox(
+              width: double.infinity,
               child: isMobile ? _buildMobileFooter() : _buildDesktopFooter(),
             ),
           ),
@@ -1575,42 +1700,39 @@ class _HomePageState extends State<HomePage> {
         const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'BF',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-            ),
+            BingusBrandMark(size: 28),
             SizedBox(width: 8),
-            Text('•', style: TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+            Text('•', style: TextStyle(color: HomeDesign.muted, fontSize: 12)),
             SizedBox(width: 8),
             Text(
-              'BingoFy',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+              'BingusFy',
+              style: TextStyle(color: HomeDesign.muted, fontSize: 12),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          alignment: WrapAlignment.center,
           children: [
             TextButton(
               onPressed: () {},
               child: const Text(
                 'Termos',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
             TextButton(
               onPressed: () {},
               child: const Text(
                 'Privacidade',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
             TextButton(
               onPressed: () {},
               child: const Text(
                 'Feedback',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
           ],
@@ -1625,16 +1747,13 @@ class _HomePageState extends State<HomePage> {
       children: [
         const Row(
           children: [
-            Text(
-              'BF',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-            ),
+            BingusBrandMark(size: 28),
             SizedBox(width: 8),
-            Text('•', style: TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+            Text('•', style: TextStyle(color: HomeDesign.muted, fontSize: 12)),
             SizedBox(width: 8),
             Text(
-              'BingoFy',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+              'BingusFy',
+              style: TextStyle(color: HomeDesign.muted, fontSize: 12),
             ),
           ],
         ),
@@ -1644,21 +1763,21 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {},
               child: const Text(
                 'Termos',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
             TextButton(
               onPressed: () {},
               child: const Text(
                 'Privacidade',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
             TextButton(
               onPressed: () {},
               child: const Text(
                 'Feedback',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                style: TextStyle(color: HomeDesign.muted, fontSize: 12),
               ),
             ),
           ],

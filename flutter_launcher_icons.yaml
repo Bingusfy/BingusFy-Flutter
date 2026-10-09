@@ -1,0 +1,15 @@
+flutter_launcher_icons:
+  image_path: assets/branding/bingusfy-dice.png
+  image_path_ios: assets/branding/bingusfy-dice.png
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: '#000000'
+  adaptive_icon_background: '#000000'
+  adaptive_icon_foreground: assets/branding/bingusfy-dice.png
+  adaptive_icon_foreground_inset: 16
+  web:
+    generate: true
+    image_path: assets/branding/bingusfy-dice.png
+    background_color: '#0A0A0A'
+    theme_color: '#1ED760'
