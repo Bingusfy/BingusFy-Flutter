@@ -61,6 +61,8 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.byType(SpotifyMiniPlayer), findsOneWidget);
+      // Let the new mini player finish its entrance before interacting.
+      await tester.pump(const Duration(milliseconds: 700));
       final mini = find.byType(SpotifyMiniPlayer);
       expect(
         find.descendant(of: mini, matching: find.text('Current song')),

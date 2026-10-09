@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'package:bingo/global/widgets/entrance_fade.dart';
+
 import 'package:bingo/modules/home/models/boards.model.dart';
 import 'package:bingo/modules/home/models/tile.model.dart';
 import 'package:bingo/modules/home/presents/home_controller.dart';
@@ -133,7 +136,9 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
-        child: _isInitializing ? _buildLoadingScreen() : _buildMainContent(),
+        child: SafeArea(
+          child: _isInitializing ? _buildLoadingScreen() : _buildMainContent(),
+        ),
       ),
     );
   }
@@ -182,7 +187,7 @@ class _HomePageState extends State<HomePage> {
     return Column(
       children: [
         // Header
-        _buildHeader(),
+        EntranceFade(child: _buildHeader()),
 
         // Main content
         Expanded(
@@ -262,9 +267,13 @@ class _HomePageState extends State<HomePage> {
                               Column(
                                 children: [
                                   // Hero/Search section
-                                  const HomeIntro(),
-                                  widget.roomPanel ??
-                                      RoomLobbyPanel(controller: controller),
+                                  const EntranceFade(child: HomeIntro()),
+                                  EntranceFade(
+                                    delay: const Duration(milliseconds: 100),
+                                    child:
+                                        widget.roomPanel ??
+                                        RoomLobbyPanel(controller: controller),
+                                  ),
                                   NotificationListener<
                                     SizeChangedLayoutNotification
                                   >(
@@ -273,14 +282,22 @@ class _HomePageState extends State<HomePage> {
                                       return false;
                                     },
                                     child: SizeChangedLayoutNotifier(
-                                      child: SpotifyPlaybackPanel(
-                                        controller: controller,
-                                        playerVisibilityKey: _mainPlayerKey,
+                                      child: EntranceFade(
+                                        delay: const Duration(
+                                          milliseconds: 180,
+                                        ),
+                                        child: SpotifyPlaybackPanel(
+                                          controller: controller,
+                                          playerVisibilityKey: _mainPlayerKey,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   if (!controller.isRoom)
-                                    _buildMainSection(context),
+                                    EntranceFade(
+                                      delay: const Duration(milliseconds: 260),
+                                      child: _buildMainSection(context),
+                                    ),
                                   SizedBox(
                                     height: isMobile
                                         ? 20
@@ -290,7 +307,12 @@ class _HomePageState extends State<HomePage> {
                                   ),
 
                                   // Boards section
-                                  _buildBoardsSection(),
+                                  EntranceFade(
+                                    delay: const Duration(milliseconds: 340),
+                                    child: _buildBoardsSection(),
+                                  ),
+                                  if (MediaQuery.sizeOf(context).height < 500)
+                                    _buildFooter(),
                                 ],
                               ),
                             ],
@@ -320,16 +342,19 @@ class _HomePageState extends State<HomePage> {
                   _pageHorizontalPadding(MediaQuery.sizeOf(context).width),
                   12,
                 ),
-                child: SpotifyMiniPlayer(
-                  controller: controller,
-                  onOpenPlayer: _openMainPlayer,
+                child: EntranceFade(
+                  child: SpotifyMiniPlayer(
+                    controller: controller,
+                    onOpenPlayer: _openMainPlayer,
+                  ),
                 ),
               );
             });
           },
         ),
         // Footer
-        _buildFooter(),
+        if (MediaQuery.sizeOf(context).height >= 500)
+          EntranceFade(child: _buildFooter()),
       ],
     );
   }
@@ -342,7 +367,8 @@ class _HomePageState extends State<HomePage> {
             constraints.maxWidth >= 640 && constraints.maxWidth < 1024;
 
         return Container(
-          height: isMobile ? 56 : 64,
+          constraints: BoxConstraints(minHeight: isMobile ? 56 : 64),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             color: const Color(0xFF0A0A0A).withValues(alpha: 0.7),
             border: const Border(
@@ -799,7 +825,9 @@ class _HomePageState extends State<HomePage> {
           'Artistas selecionados',
           style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
         ),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             TextButton(
               onPressed: controller.artistsDb.isEmpty
@@ -1020,11 +1048,13 @@ class _HomePageState extends State<HomePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Número de tabelas',
-                style: TextStyle(
-                  color: const Color(0xFFD1D5DB),
-                  fontSize: isMobile ? 16 : 14,
+              Expanded(
+                child: Text(
+                  'Número de tabelas',
+                  style: TextStyle(
+                    color: const Color(0xFFD1D5DB),
+                    fontSize: isMobile ? 16 : 14,
+                  ),
                 ),
               ),
               Text(
@@ -1368,12 +1398,20 @@ class _HomePageState extends State<HomePage> {
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
               mainAxisSpacing: constraints.maxWidth < 640 ? 16 : 20,
-              childAspectRatio: childAspectRatio,
+              mainAxisExtent: _boardHeight(
+                constraints.maxWidth,
+                crossAxisCount,
+                childAspectRatio,
+              ),
             ),
             itemCount: boards.length,
             itemBuilder: (context, index) {
               final board = boards[index];
-              return _buildBoardCard(board, index);
+              return EntranceFade(
+                key: ValueKey(board.id),
+                delay: Duration(milliseconds: (index % 4) * 80),
+                child: _buildBoardCard(board, index),
+              );
             },
           );
         });
@@ -1381,10 +1419,32 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  double _boardHeight(double width, int columns, double aspectRatio) {
+    final gap = width < 640 ? 16.0 : 20.0;
+    final cardWidth = (width - gap * (columns - 1)) / columns;
+    final padding = cardWidth < 400 ? 12.0 : 16.0;
+    final tileGap = cardWidth < 400 ? 4.0 : 6.0;
+    final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    var height = cardWidth / aspectRatio;
+    for (final board in controller.boards) {
+      final tileWidth =
+          (cardWidth - padding * 2 - tileGap * (board.gridSize - 1)) /
+          board.gridSize;
+      height = math.max(
+        height,
+        math.max(tileWidth, 56 * scale) * board.gridSize +
+            tileGap * (board.gridSize - 1) +
+            padding * 2 +
+            64 * scale,
+      );
+    }
+    return height;
+  }
+
   Widget _buildBoardCard(BingoBoard board, int boardIndex) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 300;
+        final isMobile = constraints.maxWidth < 400;
 
         return Semantics(
           container: true,
@@ -1494,7 +1554,15 @@ class _HomePageState extends State<HomePage> {
                                 (board.gridSize - 1) * spacingSize) /
                             board.gridSize;
                         final totalHeight =
-                            tileSize * board.gridSize +
+                            math.max(
+                                  tileSize,
+                                  56 *
+                                      MediaQuery.textScalerOf(
+                                        context,
+                                      ).scale(12) /
+                                      12,
+                                ) *
+                                board.gridSize +
                             (board.gridSize - 1) * spacingSize;
 
                         return SingleChildScrollView(
@@ -1511,6 +1579,14 @@ class _HomePageState extends State<HomePage> {
                                     crossAxisCount: board.gridSize,
                                     crossAxisSpacing: spacingSize,
                                     mainAxisSpacing: spacingSize,
+                                    mainAxisExtent: math.max(
+                                      tileSize,
+                                      56 *
+                                          MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(12) /
+                                          12,
+                                    ),
                                   ),
                               itemCount: board.tiles.length,
                               itemBuilder: (context, tileIndex) {
@@ -1582,92 +1658,54 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTileContent(BingoTile tile, [bool isMobile = false]) {
-    switch (tile.type) {
-      case BingoTileType.free:
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fontSize = (constraints.maxWidth * .18).clamp(10.0, 14.0);
+        final showLabel =
+            constraints.maxWidth >= 90 &&
+            constraints.maxHeight >=
+                MediaQuery.textScalerOf(context).scale(14) * 4;
         return Padding(
-          padding: EdgeInsets.all(isMobile ? 2 : 3),
+          padding: const EdgeInsets.all(4),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'FREE',
-                style: TextStyle(
-                  color: const Color(0xFF9CA3AF),
-                  fontSize: isMobile ? 7 : 9,
-                  fontWeight: FontWeight.w500,
+              if (tile.type == BingoTileType.blank) ...[
+                const Icon(Icons.music_note, color: HomeDesign.muted, size: 14),
+                const SizedBox(height: 2),
+              ],
+              if (tile.type == BingoTileType.artist && showLabel) ...[
+                const Text(
+                  'Artista',
+                  style: TextStyle(color: HomeDesign.muted, fontSize: 11),
                 ),
-              ),
-              SizedBox(height: isMobile ? 1 : 2),
-              Text(
-                'Center',
-                style: TextStyle(
-                  color: HomeController.primaryColor,
-                  fontSize: isMobile ? 10 : 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        );
-      case BingoTileType.blank:
-        return Padding(
-          padding: EdgeInsets.all(isMobile ? 2 : 3),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.music_note,
-                color: HomeDesign.muted,
-                size: isMobile ? 12 : 14,
-              ),
-              SizedBox(height: isMobile ? 1 : 2),
-              Text(
-                'Em branco',
-                style: TextStyle(
-                  color: HomeDesign.muted,
-                  fontSize: isMobile ? 8 : 10,
-                ),
-              ),
-            ],
-          ),
-        );
-      case BingoTileType.artist:
-        return Padding(
-          padding: EdgeInsets.all(isMobile ? 2 : 3), // Padding reduzido
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min, // Usa tamanho mínimo
-            children: [
-              Text(
-                'Artista',
-                style: TextStyle(
-                  color: const Color(0xFF9CA3AF),
-                  fontSize: isMobile ? 6 : 8, // Fonte ainda menor
-                ),
-              ),
-              SizedBox(height: isMobile ? 1 : 1),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    tile.content ?? '',
-                    style: TextStyle(
-                      color: const Color(0xFFE5E7EB),
-                      fontSize: isMobile ? 8 : 10, // Fonte mais reduzida
-                      fontWeight: FontWeight.w500,
-                      height: 1.0, // Altura de linha mais compacta
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: isMobile ? 3 : 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 4),
+              ],
+              Flexible(
+                child: Text(
+                  switch (tile.type) {
+                    BingoTileType.free => 'FREE\nCenter',
+                    BingoTileType.blank => 'Em branco',
+                    BingoTileType.artist => tile.content ?? '',
+                  },
+                  style: TextStyle(
+                    color: tile.type == BingoTileType.free
+                        ? HomeController.primaryColor
+                        : const Color(0xFFE5E7EB),
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
         );
-    }
+      },
+    );
   }
 
   Widget _buildFooter() {
@@ -1742,8 +1780,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDesktopFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 16,
+      runSpacing: 8,
       children: [
         const Row(
           children: [
@@ -1757,7 +1798,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        Row(
+        Wrap(
           children: [
             TextButton(
               onPressed: () {},

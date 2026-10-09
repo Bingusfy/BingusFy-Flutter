@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bingo/global/widgets/entrance_fade.dart';
 
 import 'package:bingo/modules/entry/models/spotify_playback.dart';
 import 'package:bingo/modules/entry/services/spotify_auth.dart';
@@ -243,78 +244,90 @@ class _RoomPageState extends State<RoomPage> {
     }
     final closed = _controller != null;
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Container(
-                padding: const EdgeInsets.all(28),
-                decoration: HomeDesign.surface(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(
-                      Icons.groups_rounded,
-                      color: HomeDesign.green,
-                      size: 36,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.all(
+                MediaQuery.sizeOf(context).width < 400 ? 16 : 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: EntranceFade(
+                  child: Container(
+                    padding: EdgeInsets.all(
+                      MediaQuery.sizeOf(context).width < 400 ? 20 : 28,
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      closed ? 'Sala encerrada' : 'Entre no bingo',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Você recebe sua tabela. A música fica sob o controle do dono da sala.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: HomeDesign.muted, height: 1.6),
-                    ),
-                    if (_busy)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (!closed && _room != null && !_owner) ...[
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: _name,
-                        maxLength: 40,
-                        onSubmitted: (_) => _join(),
-                        decoration: const InputDecoration(
-                          labelText: 'Seu nome',
-                          border: OutlineInputBorder(),
+                    decoration: HomeDesign.surface(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Icon(
+                          Icons.groups_rounded,
+                          color: HomeDesign.green,
+                          size: 36,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: _join,
-                        child: const Text('Entrar na sala'),
-                      ),
-                    ],
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Color(0xFFFFB4AB)),
+                        const SizedBox(height: 20),
+                        Text(
+                          closed ? 'Sala encerrada' : 'Entre no bingo',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: (MediaQuery.sizeOf(context).width * .07)
+                                .clamp(24.0, 28.0),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    TextButton(
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil('/', (_) => false),
-                      child: Text(
-                        _owner ? 'Entrar com Spotify' : 'Voltar ao início',
-                      ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Você recebe sua tabela. A música fica sob o controle do dono da sala.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: HomeDesign.muted,
+                            height: 1.6,
+                          ),
+                        ),
+                        if (_busy)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (!closed && _room != null && !_owner) ...[
+                          const SizedBox(height: 24),
+                          TextField(
+                            controller: _name,
+                            maxLength: 40,
+                            onSubmitted: (_) => _join(),
+                            decoration: const InputDecoration(
+                              labelText: 'Seu nome',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: _join,
+                            child: const Text('Entrar na sala'),
+                          ),
+                        ],
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(color: Color(0xFFFFB4AB)),
+                            ),
+                          ),
+                        TextButton(
+                          onPressed: () => Navigator.of(
+                            context,
+                          ).pushNamedAndRemoveUntil('/', (_) => false),
+                          child: Text(
+                            _owner ? 'Entrar com Spotify' : 'Voltar ao início',
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

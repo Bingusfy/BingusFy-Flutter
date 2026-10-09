@@ -62,13 +62,15 @@ class HomeIntro extends StatelessWidget {
                       size: 14,
                     ),
                     SizedBox(width: 8),
-                    Text(
-                      'MÚSICA. AMIGOS. BINGO.',
-                      style: TextStyle(
-                        color: HomeDesign.green,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 2,
+                    Flexible(
+                      child: Text(
+                        'MÚSICA. AMIGOS. BINGO.',
+                        style: TextStyle(
+                          color: HomeDesign.green,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2,
+                        ),
                       ),
                     ),
                   ],
@@ -77,7 +79,9 @@ class HomeIntro extends StatelessWidget {
                 Text(
                   'Dê o play no seu bingo.',
                   style: TextStyle(
-                    fontSize: compact ? 30 : 42,
+                    fontSize: compact
+                        ? (constraints.maxWidth * .09).clamp(26.0, 30.0)
+                        : 42,
                     height: 1.15,
                     letterSpacing: -1.4,
                     fontWeight: FontWeight.w800,

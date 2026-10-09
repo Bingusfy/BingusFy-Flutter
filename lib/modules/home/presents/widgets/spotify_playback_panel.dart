@@ -3,6 +3,7 @@ import 'package:bingo/modules/entry/services/spotify_auth.dart';
 import 'package:bingo/modules/home/presents/home_controller.dart';
 import 'package:bingo/modules/home/presents/widgets/home_design.dart';
 import 'package:flutter/material.dart';
+import 'package:bingo/global/widgets/entrance_fade.dart';
 import 'package:get/get.dart';
 
 class SpotifyPlaybackPanel extends StatelessWidget {
@@ -41,11 +42,13 @@ class SpotifyPlaybackPanel extends StatelessWidget {
                   children: [
                     BingusBrandMark(size: 28),
                     SizedBox(width: 8),
-                    Text(
-                      controller.isRoomGuest
-                          ? 'Spotify da sala'
-                          : 'Seu Spotify',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    Flexible(
+                      child: Text(
+                        controller.isRoomGuest
+                            ? 'Spotify da sala'
+                            : 'Seu Spotify',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -171,8 +174,11 @@ class SpotifyPlaybackPanel extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) => Row(
               children: [
-                _artwork(current, constraints.maxWidth < 400 ? 84 : 112),
-                const SizedBox(width: 18),
+                _artwork(
+                  current,
+                  (constraints.maxWidth * .26).clamp(56.0, 112.0),
+                ),
+                SizedBox(width: constraints.maxWidth < 320 ? 12 : 18),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,8 +187,11 @@ class SpotifyPlaybackPanel extends StatelessWidget {
                         current?.name ?? 'Nenhuma música em reprodução',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 22,
+                        style: TextStyle(
+                          fontSize: (constraints.maxWidth * .06).clamp(
+                            18.0,
+                            22.0,
+                          ),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -356,8 +365,8 @@ class SpotifyPlaybackPanel extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final track = tracks[index];
-                  return SizedBox(
-                    height: 52,
+                  return ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 52),
                     child: Row(
                       children: [
                         SizedBox(
@@ -435,6 +444,7 @@ class SpotifyPlaybackPanel extends StatelessWidget {
               width: size,
               height: size,
               fit: BoxFit.cover,
+              frameBuilder: fadeImageFrame,
               errorBuilder: (_, _, _) => fallback,
             ),
     );

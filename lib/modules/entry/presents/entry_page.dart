@@ -4,6 +4,7 @@ import 'package:bingo/modules/entry/widgets/entry_artist_gallery_background.dart
 import 'package:bingo/modules/entry/services/spotify_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:bingo/global/widgets/bingus_brand_mark.dart';
+import 'package:bingo/global/widgets/entrance_fade.dart';
 
 class EntryPage extends StatefulWidget {
   const EntryPage({super.key});
@@ -82,14 +83,22 @@ class _EntryPageState extends State<EntryPage> {
               ),
             ),
           ),
-          const EntryFloatingBackground(
-            assetPath: 'assets/branding/bingusfy-dice.png',
+          const EntranceFade(
+            delay: Duration(milliseconds: 150),
+            duration: Duration(milliseconds: 1000),
+            child: EntryFloatingBackground(
+              assetPath: 'assets/branding/bingusfy-dice.png',
+            ),
           ),
-          const EntryFloatingBackground(
-            assetPath: 'assets/branding/bingusfy-trophy-transparent.png',
-            lowerLeft: true,
+          const EntranceFade(
+            delay: Duration(milliseconds: 250),
+            duration: Duration(milliseconds: 1000),
+            child: EntryFloatingBackground(
+              assetPath: 'assets/branding/bingusfy-trophy-transparent.png',
+              lowerLeft: true,
+            ),
           ),
-          const MusicalWavesBackground(),
+          const EntranceFade(child: MusicalWavesBackground()),
           const IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -109,7 +118,13 @@ class _EntryPageState extends State<EntryPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 600;
-                final padding = compact ? 24.0 : 48.0;
+                final padding = compact
+                    ? (constraints.maxWidth * .05).clamp(16.0, 24.0)
+                    : 48.0;
+                final shortScreen = constraints.maxHeight < 600;
+                final headingSize = compact
+                    ? (constraints.maxWidth * .10).clamp(30.0, 40.0)
+                    : 60.0;
 
                 return SingleChildScrollView(
                   child: ConstrainedBox(
@@ -121,152 +136,173 @@ class _EntryPageState extends State<EntryPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Row(
-                            children: [
-                              BingusBrandMark(size: 40),
-                              SizedBox(width: 10),
-                              Text(
-                                'BingusFy',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+                          EntranceFade(
+                            child: Row(
+                              children: [
+                                BingusBrandMark(size: compact ? 32 : 40),
+                                const SizedBox(width: 10),
+                                const Flexible(
+                                  child: Text(
+                                    'BingusFy',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 56),
+                            padding: EdgeInsets.symmetric(
+                              vertical: shortScreen ? 24 : 56,
+                            ),
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 560),
                               child: Column(
-                                children: [
-                                  Text(
-                                    'Seu próximo bingo\ncomeça no play.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: compact ? 40 : 60,
-                                      height: 1.08,
-                                      letterSpacing: -2,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 22),
-                                  const Text(
-                                    'Transforme seus artistas favoritos em cartelas.\nReúna a galera e deixe a música fazer o resto.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Color(0xFFD1D5DB),
-                                      fontSize: 16,
-                                      height: 1.6,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 36),
-                                  Container(
-                                    width: 380,
-                                    padding: EdgeInsets.all(compact ? 24 : 32),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xEE101410),
-                                      borderRadius: BorderRadius.circular(24),
-                                      border: Border.all(
-                                        color: const Color(0x26FFFFFF),
+                                children:
+                                    [
+                                      Text(
+                                        'Seu próximo bingo\ncomeça no play.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: headingSize,
+                                          height: 1.08,
+                                          letterSpacing: compact ? -1 : -2,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Color(0x44000000),
-                                          blurRadius: 40,
-                                          offset: Offset(0, 16),
+                                      const SizedBox(height: 22),
+                                      const Text(
+                                        'Transforme seus artistas favoritos em cartelas.\nReúna a galera e deixe a música fazer o resto.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Color(0xFFD1D5DB),
+                                          fontSize: 16,
+                                          height: 1.6,
                                         ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        const Text(
-                                          'Bem-vindo ao BingusFy',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                      ),
+                                      const SizedBox(height: 36),
+                                      Container(
+                                        width: 380,
+                                        padding: EdgeInsets.all(
+                                          compact ? 20 : 32,
                                         ),
-                                        const SizedBox(height: 10),
-                                        const Text(
-                                          'Sua seleção, seu ritmo, seu jogo.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Color(0xFF9CA3AF),
-                                            fontSize: 13,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xEE101410),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
                                           ),
+                                          border: Border.all(
+                                            color: const Color(0x26FFFFFF),
+                                          ),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Color(0x44000000),
+                                              blurRadius: 40,
+                                              offset: Offset(0, 16),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(height: 26),
-                                        FilledButton(
-                                          onPressed:
-                                              !_busy && SpotifyAuth.configured
-                                              ? _signIn
-                                              : null,
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: _green,
-                                            foregroundColor: const Color(
-                                              0xFF07170B,
-                                            ),
-                                            minimumSize: const Size.fromHeight(
-                                              54,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Image.asset(
-                                                'assets/branding/spotify-icon-black.png',
-                                                width: 24,
-                                                height: 24,
-                                                excludeFromSemantics: true,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            const Text(
+                                              'Bem-vindo ao BingusFy',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w600,
                                               ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                _busy
-                                                    ? 'Conectando...'
-                                                    : 'Continuar com Spotify',
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w700,
+                                            ),
+                                            const SizedBox(height: 10),
+                                            const Text(
+                                              'Sua seleção, seu ritmo, seu jogo.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: Color(0xFF9CA3AF),
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 26),
+                                            FilledButton(
+                                              onPressed:
+                                                  !_busy &&
+                                                      SpotifyAuth.configured
+                                                  ? _signIn
+                                                  : null,
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: _green,
+                                                foregroundColor: const Color(
+                                                  0xFF07170B,
+                                                ),
+                                                minimumSize:
+                                                    const Size.fromHeight(54),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Image.asset(
+                                                    'assets/branding/spotify-icon-black.png',
+                                                    width: 24,
+                                                    height: 24,
+                                                    frameBuilder:
+                                                        fadeImageFrame,
+                                                    excludeFromSemantics: true,
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Flexible(
+                                                    child: Text(
+                                                      _busy
+                                                          ? 'Conectando...'
+                                                          : 'Continuar com Spotify',
+                                                      style: const TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            if (!SpotifyAuth.configured) ...[
+                                              const SizedBox(height: 14),
+                                              const Text(
+                                                'O acesso com Spotify estará disponível em breve.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Color(0xFF9CA3AF),
+                                                  fontSize: 12,
                                                 ),
                                               ),
                                             ],
-                                          ),
+                                            if (_error != null) ...[
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                _error!,
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Color(0xFFFFB4AB),
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
-                                        if (!SpotifyAuth.configured) ...[
-                                          const SizedBox(height: 14),
-                                          const Text(
-                                            'O acesso com Spotify estará disponível em breve.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: Color(0xFF9CA3AF),
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                        if (_error != null) ...[
-                                          const SizedBox(height: 14),
-                                          Text(
-                                            _error!,
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              color: Color(0xFFFFB4AB),
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
+                                      ),
+                                    ].withEntranceFade(
+                                      delayMilliseconds: 120,
+                                      intervalMilliseconds: 140,
                                     ),
-                                  ),
-                                ],
                               ),
                             ),
                           ),

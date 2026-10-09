@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'entrance_fade.dart';
 
 class BingusBrandMark extends StatelessWidget {
   const BingusBrandMark({super.key, this.size = 36});
@@ -11,6 +12,7 @@ class BingusBrandMark extends StatelessWidget {
     width: size,
     height: size,
     fit: BoxFit.contain,
+    frameBuilder: fadeImageFrame,
     filterQuality: FilterQuality.high,
     semanticLabel: 'Ícone do BingusFy',
   );

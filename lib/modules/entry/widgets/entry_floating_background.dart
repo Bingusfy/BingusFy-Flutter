@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bingo/global/widgets/entrance_fade.dart';
 
 class EntryFloatingBackground extends StatefulWidget {
   const EntryFloatingBackground({
@@ -47,8 +48,8 @@ class _EntryFloatingBackgroundState extends State<EntryFloatingBackground>
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 600;
           final originalSize = compact
-              ? (constraints.maxWidth * .68).clamp(220.0, 300.0)
-              : (constraints.maxWidth * .36).clamp(320.0, 580.0);
+              ? (constraints.biggest.shortestSide * .60).clamp(150.0, 280.0)
+              : (constraints.biggest.shortestSide * .65).clamp(200.0, 580.0);
           final size = originalSize * .9;
           return Stack(
             clipBehavior: Clip.hardEdge,
@@ -101,6 +102,7 @@ class _EntryFloatingBackgroundState extends State<EntryFloatingBackground>
                             child: Image.asset(
                               widget.assetPath,
                               fit: BoxFit.contain,
+                              frameBuilder: fadeImageFrame,
                               filterQuality: FilterQuality.high,
                             ),
                           ),
