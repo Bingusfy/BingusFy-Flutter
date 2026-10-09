@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:bingo/modules/entry/widgets/musical_waves_background.dart';
 import 'package:bingo/modules/entry/widgets/entry_floating_background.dart';
 import 'package:bingo/modules/entry/widgets/entry_artist_gallery_background.dart';
 import 'package:bingo/modules/entry/services/spotify_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:bingo/global/widgets/bingus_brand_mark.dart';
 import 'package:bingo/global/widgets/entrance_fade.dart';
 
@@ -47,13 +50,24 @@ class _EntryPageState extends State<EntryPage> {
     });
     try {
       await SpotifyAuth.signIn();
+      if (!kIsWeb) await _restore();
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _error =
+              'O login demorou mais que o esperado. Confira sua conexão e tente novamente.';
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = 'Não foi possível abrir o Spotify. Tente novamente.';
+          _error =
+              'Não foi possível concluir o login com Spotify. Tente novamente.';
         });
       }
+    } finally {
+      if (!kIsWeb && mounted) setState(() => _busy = false);
     }
   }
 

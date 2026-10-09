@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "name": "BingusFy | iOS (iPhone físico · release)",
+      "deviceId": "00008110-001239A2263A201E",
+      "flutterMode": "release",
+      "toolArgs": [
+        "--dart-define=SPOTIFY_CLIENT_ID=d42d00f9cfa740faa9806ca5a0f2e650"
+      ]
+    },
+    {
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "name": "BingusFy | Android (selecione o dispositivo)",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--dart-define=SPOTIFY_CLIENT_ID=d42d00f9cfa740faa9806ca5a0f2e650"
+      ]
+    },
+    {
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}",
+      "name": "BingusFy | Web (Chrome)",
+      "deviceId": "chrome",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--web-hostname=127.0.0.1",
+        "--web-port=8080",
+        "--dart-define=SPOTIFY_CLIENT_ID=d42d00f9cfa740faa9806ca5a0f2e650",
+        "--dart-define=SPOTIFY_REDIRECT_URI=http://127.0.0.1:8080/"
+      ]
+    }
+  ]
+}

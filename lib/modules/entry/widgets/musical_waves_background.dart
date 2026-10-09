@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 /// Slow sound waves with a simulated rhythm, drawn directly by Flutter.
 class MusicalWavesBackground extends StatefulWidget {
@@ -37,9 +38,35 @@ class _MusicalWavesBackgroundState extends State<MusicalWavesBackground>
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: RepaintBoundary(
-        child: CustomPaint(
-          painter: _MusicalWavesPainter(_motion),
-          child: const SizedBox.expand(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final nativeMobile =
+                !kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.iOS ||
+                    defaultTargetPlatform == TargetPlatform.android);
+            if (!nativeMobile) {
+              return CustomPaint(
+                painter: _MusicalWavesPainter(_motion),
+                child: const SizedBox.expand(),
+              );
+            }
+            // A phone is a window onto the same large waves. Crop the artwork
+            // instead of squeezing its wavelength into the viewport.
+            final width = math.max(1440.0, constraints.maxWidth);
+            final height = math.max(900.0, constraints.maxHeight);
+            return ClipRect(
+              child: OverflowBox(
+                minWidth: width,
+                maxWidth: width,
+                minHeight: height,
+                maxHeight: height,
+                child: CustomPaint(
+                  painter: _MusicalWavesPainter(_motion),
+                  child: SizedBox(width: width, height: height),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

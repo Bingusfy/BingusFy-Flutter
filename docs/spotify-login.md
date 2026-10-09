@@ -106,3 +106,26 @@ flutter test
 node --test test/spotify_auth_test.cjs
 flutter build web
 ```
+
+## iPhone físico
+
+O iOS usa AppAuth com Authorization Code + PKCE e guarda a sessão no Keychain.
+Cadastre também a Redirect URI abaixo no mesmo app do Spotify Dashboard (ela
+precisa corresponder exatamente ao esquema registrado no Info.plist):
+
+`br.com.theusmatag.bingo://spotify-callback`
+
+```sh
+flutter run --release -d 00008110-001239A2263A201E --dart-define=SPOTIFY_CLIENT_ID=d42d00f9cfa740faa9806ca5a0f2e650
+```
+
+O retorno nativo é fixo e independente de `SPOTIFY_REDIRECT_URI`, que continua
+sendo usado pela web. Não use o endereço loopback do Chrome como callback iOS.
+Após autorizar, o app abre a home; cancelar devolve o botão ao estado inicial.
+A sessão pode ser restaurada após fechar o app e é apagada ao tocar em Sair.
+A configuração Firebase das salas é independente do login Spotify.
+
+Nos apps nativos iOS e Android, as ondas mantêm uma área de desenho mínima de
+1440 × 900, centralizada e recortada nas bordas, preservando a escala sem causar
+rolagem. Na web, inclusive em navegadores de celular, o fundo mantém o
+dimensionamento original pela área disponível.

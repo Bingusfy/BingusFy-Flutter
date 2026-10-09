@@ -3,6 +3,7 @@ import 'package:bingo/modules/entry/services/spotify_auth.dart';
 import 'package:bingo/modules/home/presents/home_controller.dart';
 import 'package:bingo/modules/home/presents/widgets/home_design.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:bingo/global/widgets/entrance_fade.dart';
 import 'package:get/get.dart';
 
@@ -69,8 +70,13 @@ class SpotifyPlaybackPanel extends StatelessWidget {
                   ),
                 if (!controller.isRoomGuest)
                   TextButton.icon(
-                    onPressed: () {
-                      SpotifyAuth.signOut();
+                    onPressed: () async {
+                      if (kIsWeb) {
+                        SpotifyAuth.signOut();
+                      } else {
+                        await SpotifyAuth.signOut();
+                        if (!context.mounted) return;
+                      }
                       Navigator.of(
                         context,
                       ).pushNamedAndRemoveUntil('/', (_) => false);

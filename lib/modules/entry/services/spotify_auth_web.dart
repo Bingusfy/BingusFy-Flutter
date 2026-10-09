@@ -42,7 +42,7 @@ class SpotifyAuth {
     return SpotifyPlayback.fromJson(jsonDecode(json) as Map<String, dynamic>);
   }
 
-  static void signOut() => _signOut();
+  static Future<void> signOut() async => _signOut();
 
   static Future<void> controlPlayback(String action) async {
     final result =

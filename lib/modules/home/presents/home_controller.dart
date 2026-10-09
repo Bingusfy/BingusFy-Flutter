@@ -228,6 +228,7 @@ class HomeController extends GetxController with WidgetsBindingObserver {
     if (isRoomGuest) return;
     try {
       await SpotifyAuth.signIn();
+      if (!kIsWeb) await refreshSpotify();
     } catch (_) {
       if (!isClosed) {
         spotifyError.value = 'Não foi possível abrir o login do Spotify.';

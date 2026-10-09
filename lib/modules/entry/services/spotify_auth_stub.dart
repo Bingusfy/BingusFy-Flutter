@@ -9,7 +9,7 @@ class SpotifyAuth {
 
   static Future<SpotifyPlayback> loadPlayback() async =>
       throw const SpotifyPlaybackException('session_expired');
-  static void signOut() {}
+  static Future<void> signOut() async {}
   static Future<void> controlPlayback(String action) async =>
       throw const SpotifyPlaybackException('session_expired');
 }
